@@ -1,112 +1,43 @@
-from fastapi import File, UploadFile, Form, routing, BackgroundTasks
+from fastapi import File, UploadFile, Form, routing, BackgroundTasks, Depends
 from pathlib import Path
+from sqlalchemy.orm import Session
+from app.database import get_db
 import shutil
-import tempfile
-import whisper
-import ffmpeg
-import soundfile as sf
-import librosa
-import os
+from app.models import Job
+from app.background_tasks import main_background_function
 
 router = routing.APIRouter()
 
-# Load Whisper model only once
-MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
-print(f"[INFO] Loading Whisper model: {MODEL_SIZE}")
-whisper_model = whisper.load_model(MODEL_SIZE)
-print("[INFO] Whisper model loaded.")
 
-
-def convert_video_to_audio(video_path: str, output_audio_path: str) -> str:
-    video_path = Path(video_path)
-    audio_path = Path(output_audio_path)
-    audio_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        print(f"[INFO] Extracting audio from video: {video_path}")
-        stream = ffmpeg.input(str(video_path))
-        stream = ffmpeg.output(stream, str(output_audio_path), acodec='pcm_s16le', ac=1, ar='16k')
-        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-        print(f"[INFO] Converted video to audio: {output_audio_path}")
-        return str(output_audio_path)
-    except Exception as e:
-        print(f"[ERROR] Error converting video: {e}")
-        raise
-
-
-def split_audio_to_patches(audio_path: str, patch_duration_sec: int = 120, overlap_sec: int = 30):
-    print(f"[INFO] Loading audio for patching: {audio_path}")
-    y, sr = librosa.load(audio_path, sr=None)
-    total_duration = librosa.get_duration(y=y, sr=sr)
-    print(f"[INFO] Audio duration: {total_duration:.2f} seconds")
-    patch_samples = int(patch_duration_sec * sr)
-    overlap_samples = int(overlap_sec * sr)
-    step = patch_samples - overlap_samples
-    patches = []
-    for start in range(0, len(y), step):
-        end = min(start + patch_samples, len(y))
-        patch_y = y[start:end]
-        patch_idx = len(patches)
-        patch_path = Path(audio_path).parent / f"patch_{patch_idx:03d}.wav"
-        sf.write(str(patch_path), patch_y, sr)
-        print(f"[INFO] Saved patch {patch_idx}: {patch_path} ({(end-start)/sr:.2f}s)")
-        patches.append(str(patch_path))
-        if end == len(y):
-            break
-    return patches
-
-
-def transcribe_patches(patches, model):
-    all_results = []
-    for i, patch_path in enumerate(patches):
-        print(f"[INFO] Transcribing patch {i}: {patch_path}")
-        result = model.transcribe(patch_path, word_timestamps=True, verbose=False)
-        lang = result.get('language', 'unknown')
-        words = []
-        word_id = 0
-        for segment in result.get('segments', []):
-            for word in segment.get('words', []):
-                words.append({
-                    'id': word_id,
-                    'word': word.get('word', '').strip(),
-                    'start': word.get('start', segment.get('start', None)),
-                    'end': word.get('end', segment.get('end', None)),
-                    'probability': word.get('probability', None),
-                    'phrase_text': segment.get('text', ''),
-                    'phrase_start': segment.get('start', None),
-                    'phrase_end': segment.get('end', None)
-                })
-                word_id += 1
-        patch_result = {
-            'language': lang,
-            'words': words,
-            'patch_index': i,
-            'patch_text': result.get('text', '')
-        }
-        print(f"[INFO] Patch {i} language: {lang}, words: {len(words)}")
-        all_results.append(patch_result)
-    return all_results
-
-
-@router.post("/transcribe")
+@router.post("")
 async def transcribe(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     patch_duration_sec: int = Form(120),
-    overlap_sec: int = Form(30)
+    overlap_sec: int = Form(30),
+    db: Session = Depends(get_db)
 ):
-    # Save uploaded file to temp
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = Path(tmpdir) / file.filename
-        with open(input_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-        # If video, convert to audio
-        if input_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']:
-            audio_path = Path(tmpdir) / (input_path.stem + '.wav')
-            convert_video_to_audio(str(input_path), str(audio_path))
-        else:
-            audio_path = input_path
-        # Split audio
-        patches = split_audio_to_patches(str(audio_path), patch_duration_sec, overlap_sec)
-        # Transcribe
-        all_results = transcribe_patches(patches, whisper_model)
-        return all_results
+    # Save the uploaded file permanently (original copy)
+    uploads_dir = Path("uploads")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    original_path = uploads_dir / file.filename
+    with open(original_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    job = Job(original_file_path=str(original_path), status="transcribing")
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    # Launch background task
+    background_tasks.add_task(
+        main_background_function,
+        job.id,
+        str(original_path),
+        patch_duration_sec,
+        overlap_sec,
+        db
+    )
+
+    return job.id
 
