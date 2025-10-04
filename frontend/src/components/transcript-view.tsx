@@ -1,9 +1,8 @@
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { useState, forwardRef } from 'react';
+import { useState } from 'react';
+import AudioWaveformPlayer from './audio-waveform-player';
 import type { FlagType } from './flag-icon';
-import ConfidenceMediaPlayer, { type ConfidenceMediaPlayerRef } from './confidence-media-player';
-import type { AnalysisSpan } from '@/lib/api';
 
 export interface TranscriptSegment {
   id: string;
@@ -17,13 +16,11 @@ interface TranscriptViewProps {
   segments: TranscriptSegment[];
   isVisible: boolean;
   audioFile?: File;
-  spans?: AnalysisSpan[];
 }
 
 
 
-const TranscriptView = forwardRef<ConfidenceMediaPlayerRef, TranscriptViewProps>(
-  ({ segments, isVisible, audioFile, spans }, ref) => {
+export default function TranscriptView({ segments, isVisible, audioFile }: TranscriptViewProps) {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
 
   if (!isVisible) return null;
@@ -32,15 +29,25 @@ const TranscriptView = forwardRef<ConfidenceMediaPlayerRef, TranscriptViewProps>
     setActiveSegmentId(segmentId);
   };
 
+  // Convert segments to the format expected by AudioWaveformPlayer
+  const playerSegments = segments.map(segment => ({
+    id: segment.id,
+    timestamp: segment.timestamp,
+    text: segment.text,
+    flag: (segment.flag === 'neutral' ? 'normal' : segment.flag) as 'normal' | 'mild' | 'extremist'
+  }));
+
   return (
     <div className="space-y-6">
-      {/* Audio Media Player with Confidence Graph */}
-      {audioFile && (
-        <ConfidenceMediaPlayer ref={ref} audioFile={audioFile} spans={spans} />
-      )}
+      {/* Audio Waveform Player */}
+      <AudioWaveformPlayer
+        audioFile={audioFile || null}
+        segments={playerSegments}
+        onSegmentClick={handleSegmentClick}
+      />
 
       {/* Interactive Transcript */}
-      {/* <Card>
+      <Card>
         <CardHeader>
           <CardTitle>Interactive Transcript</CardTitle>
         </CardHeader>
@@ -105,11 +112,7 @@ const TranscriptView = forwardRef<ConfidenceMediaPlayerRef, TranscriptViewProps>
             </div>
           </ScrollArea>
         </CardContent>
-      </Card> */}
+      </Card>
     </div>
   );
-});
-
-TranscriptView.displayName = 'TranscriptView';
-
-export default TranscriptView;
+}

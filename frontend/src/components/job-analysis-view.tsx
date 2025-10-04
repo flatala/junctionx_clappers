@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import ErrorAlert from './error-alert';
 import { useExport } from '@/hooks/use-export';
 import type { FlagType } from './flag-icon';
 import InteractiveTranscript from './interactive-transcript';
-import type { ConfidenceMediaPlayerRef } from './confidence-media-player';
 
 // Helper function to parse time string to seconds
 const parseTimeToSeconds = (timeStr: string): number => {
@@ -62,7 +61,6 @@ export default function JobAnalysisView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
-  const audioPlayerRef = useRef<ConfidenceMediaPlayerRef>(null);
 
   // Convert analysis result to transcript segments
   const transcriptSegments = analysisResult ? convertToTranscriptSegments(analysisResult) : [];
@@ -112,21 +110,6 @@ export default function JobAnalysisView() {
   };
 
   const clearError = () => setError(null);
-
-  const handleSpanClick = (spanStart: string) => {
-    // Parse time string to seconds
-    const parts = spanStart.split(':');
-    const seconds = parseFloat(parts[parts.length - 1]);
-    const minutes = parts.length > 1 ? parseInt(parts[parts.length - 2]) : 0;
-    const hours = parts.length > 2 ? parseInt(parts[parts.length - 3]) : 0;
-    const timeInSeconds = hours * 3600 + minutes * 60 + seconds;
-
-    // Seek to the timestamp and play
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.seekTo(timeInSeconds);
-      audioPlayerRef.current.play();
-    }
-  };
 
   if (isLoading) {
     return (
@@ -204,12 +187,12 @@ export default function JobAnalysisView() {
 
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Full Transcript */}
+          {/* Full Transcript with Confidence Scores */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Full Transcript</CardTitle>
               <CardDescription>
-                Click on highlighted text to jump to that moment in the audio
+                Hover over highlighted text to see confidence scores and rationale
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -217,7 +200,6 @@ export default function JobAnalysisView() {
                 <InteractiveTranscript
                   transcriptText={analysisResult.transcript_text}
                   spans={analysisResult.spans}
-                  onSpanClick={handleSpanClick}
                 />
               </div>
             </CardContent>
@@ -227,8 +209,6 @@ export default function JobAnalysisView() {
             segments={transcriptSegments}
             isVisible={true}
             audioFile={audioFile || undefined}
-            spans={analysisResult?.spans}
-            ref={audioPlayerRef}
           />
         </div>
       </div>
