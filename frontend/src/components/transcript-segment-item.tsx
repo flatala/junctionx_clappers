@@ -4,7 +4,6 @@ interface TranscriptSegmentItemProps {
   id: string;
   timestamp: string;
   text: string;
-  confidence: number;
   flag: FlagType;
   explanation?: string;
 }
@@ -51,7 +50,6 @@ const getFlagLabel = (flag: FlagType) => {
 export default function TranscriptSegmentItem({
   timestamp,
   text,
-  confidence,
   flag,
   explanation
 }: TranscriptSegmentItemProps) {
@@ -65,9 +63,6 @@ export default function TranscriptSegmentItem({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-            {(confidence * 100).toFixed(0)}% confidence
-          </span>
           {flag !== 'neutral' && (
             <span className={`text-xs px-2 py-1 rounded-full font-medium ${
               flag === 'mild' ? 'bg-secondary text-secondary-foreground' :

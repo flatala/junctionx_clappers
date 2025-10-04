@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Input } from './ui/input';
-import { Upload } from 'lucide-react';
 
 interface FileDropZoneProps {
   onFileSelect: (file: File) => void;

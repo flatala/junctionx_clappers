@@ -6,7 +6,6 @@ interface SummaryData {
   flaggedDuration: string;
   flaggedPercentage: number;
   segmentsFlagged: number;
-  avgConfidence: number;
 }
 
 interface SummaryTableProps {
@@ -41,10 +40,6 @@ export default function SummaryTable({ summaryData }: SummaryTableProps) {
             <TableRow>
               <TableCell className="font-medium">Segments Flagged</TableCell>
               <TableCell>{summaryData.segmentsFlagged}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Avg. Confidence</TableCell>
-              <TableCell>{summaryData.avgConfidence.toFixed(2)}</TableCell>
             </TableRow>
           </TableBody>
         </Table>

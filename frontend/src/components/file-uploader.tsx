@@ -183,7 +183,7 @@ export default function FileUploader({
                   Drop your file here or click to browse
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports MP3, WAV, MP4 files up to 100MB
+                  Supports MP3, WAV, MP4 and other audio/video files
                 </p>
               </div>
             </div>
