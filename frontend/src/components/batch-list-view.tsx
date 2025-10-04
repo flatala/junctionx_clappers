@@ -241,7 +241,7 @@ export default function BatchListView() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="block text-sm font-medium mb-1">
                 Negative Examples
                 <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
               </label>
