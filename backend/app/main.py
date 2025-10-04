@@ -1,8 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from app.database import engine, Base
 from app.test_user import router as user_router
-import whisper
-import tempfile
+from app.whisper_processing import process_audio_file
 
 
 # Create database tables
@@ -14,10 +13,6 @@ app = FastAPI(
     version="1.0.0"
 )
 app.include_router(router=user_router, prefix="/users", tags=["users"])
-
-
-# Load model once on startup
-whisper_model = whisper.load_model("small")
 
 
 @app.get("/")
@@ -38,16 +33,8 @@ def health_check():
     }
 
 
-@app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+@app.post("/upload-audio")
+async def process_audio(file: UploadFile = File(...)):
+    result = await process_audio_file(file)
 
-    result = whisper_model.transcribe(tmp_path)
-
-    return {
-        "text": result["text"],
-        "segments": result["segments"],  # includes start/end timestamps
-        "language": result["language"],
-    }
+    return result
