@@ -1,0 +1,11 @@
+.git
+__pycache__
+*.ipynb
+*.md
+*.log
+*.csv
+*.mp4
+*.wav
+node_modules
+frontend
+backend
