@@ -14,25 +14,56 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-#    networks:
-#      - junctionx_network
+    networks:
+      - junctionx_network
 
-#  language_agent:
-#    build:
-#      context: ./llm_agent
-#      dockerfile: Dockerfile
-#    container_name: junctionx_language_agent
-#    restart: always
-#    ports:
-#      - "8001:8001"
-#    networks:
-#      - junctionx_network
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-#      interval: 30s
-#      timeout: 10s
-#      retries: 3
-#      start_period: 120s
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: junctionx_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - mysql
+    environment:
+      DATABASE_URL: mysql+pymysql://user:password@mysql:3306/junctionx_db
+    networks:
+      - junctionx_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: junctionx_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - junctionx_network
+
+  language_agent:
+    build:
+      context: ./llm_agent
+      dockerfile: Dockerfile
+    container_name: junctionx_language_agent
+    restart: always
+    ports:
+      - "8001:8001"
+    networks:
+      - junctionx_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
 volumes:
   mysql_data:

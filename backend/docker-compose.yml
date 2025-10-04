@@ -15,18 +15,20 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
-  # backend:
-  #   build: .
-  #   container_name: backend_app
-  #   restart: always
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - .:/app   # mount code for live reload (optional)
-  #   depends_on:
-  #     - mysql
-  #   env_file:
-  #     - .env
+  backend:
+    build: .
+    container_name: backend_app
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app   # mount code for live reload (optional)
+    depends_on:
+      - mysql
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: mysql+pymysql://user:password@mysql:3306/junctionx_db
 
 volumes:
   mysql_data:
