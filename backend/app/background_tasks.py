@@ -7,6 +7,7 @@ import os
 import whisper
 from app.models import Job
 import requests
+import string
 
 
 # Load Whisper model only once
@@ -54,10 +55,51 @@ def send_to_llm(transcribed_text: str):
     return result
 
 
+def normalize_word(word):
+    # Lowercase and strip punctuation from both ends
+    return word.strip(string.punctuation).lower()
+
+
+def find_matching_spans(transcribed_patches: dict, llm_spans: list):
+    full_text = transcribed_patches["patch_text"].strip()
+    words = full_text.split()
+    norm_words = [normalize_word(w) for w in words]
+    n = len(norm_words)
+
+    processed_spans = []
+
+    for llm_span in llm_spans:
+        span_text = llm_span["text"]
+
+        span_words = span_text.split()
+        norm_span_word = [normalize_word(w) for w in span_words]
+        m = len(norm_span_word)
+
+        for i in range(n - m + 1):
+            if norm_words[i:i + m] == norm_span_word:
+                start_ind = i
+                end_ind = i + m - 1
+
+                processed_spans.append({
+                    "start": transcribed_patches["words"][start_ind]["start"],
+                    "end": transcribed_patches["words"][end_ind]["end"],
+                    "text": span_text,
+                    "rationale": llm_span["rationale"]
+                })
+
+    return processed_spans
+
+
 def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session):
+
+    job = db.get(Job, job_id)
+    job.status = "transcribing"
+    db.commit()
+    db.expire_all()
 
     transcribed_patches = process_file(original_path, patch_duration_sec, overlap_sec)
 
+    print(transcribed_patches)
 
     transcribed_text = transcribed_patches[0]["patch_text"].strip()
 
@@ -66,14 +108,22 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     with open(txt_path, 'w', encoding='utf-8') as f:
         f.write(transcribed_text)
 
-    # Update job in DB
     job = db.get(Job, job_id)
-    job.status = "transcribed"
+    job.status = "analysing"
     db.commit()
+    db.expire_all()
 
+    result_from_llm = send_to_llm(transcribed_text)
 
-    processed_text = send_to_llm(transcribed_text)
+    print(result_from_llm)
 
-    print(processed_text)
+    llm_spans = result_from_llm["spans"]
+    processed_spans = find_matching_spans(transcribed_patches[0], llm_spans)
+
+    print(processed_spans)
+
+    job = db.get(Job, job_id)
+    job.status = "done"
+    db.commit()
 
     db.close()
