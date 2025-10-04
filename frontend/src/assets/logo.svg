@@ -1,0 +1,23 @@
+<!-- PERUN rounded geometric emblem -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Perun rounded geometric emblem">
+  <title>Perun rounded geometric emblem</title>
+  <g transform="translate(256 256)">
+    <!-- 6 rounded rays (capsule-like) -->
+    <g fill="#000">
+      <!-- one vertical ray, then rotate 5 copies -->
+      <rect x="-20" y="-160" width="40" height="320" rx="20" ry="20" transform="rotate(30)"/>
+      <rect x="-20" y="-160" width="40" height="320" rx="20" ry="20" transform="rotate(90)"/>
+      <rect x="-20" y="-160" width="40" height="320" rx="20" ry="20" transform="rotate(330)"/>
+    </g>
+
+    <!-- 6 outer dots placed between rays (30° offset) -->
+    <g fill="#000">
+      <circle r="22" cx="0" cy="-210" transform="rotate(30)"/>
+      <circle r="22" cx="0" cy="-210" transform="rotate(90)"/>
+      <circle r="22" cx="0" cy="-210" transform="rotate(150)"/>
+      <circle r="22" cx="0" cy="-210" transform="rotate(210)"/>
+      <circle r="22" cx="0" cy="-210" transform="rotate(270)"/>
+      <circle r="22" cx="0" cy="-210" transform="rotate(330)"/>
+    </g>
+  </g>
+</svg>
