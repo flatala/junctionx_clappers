@@ -82,7 +82,8 @@ async def refine_criteria_endpoint(request: CriteriaRequest):
 @app.post("/detect", response_model=DetectionResponse)
 async def detect_extremist_content(request: DetectionRequest):
     """Detect extremist content in transcribed text."""
-    logger.info(f"→ REQUEST: {len(request.transcription)} chars, {len(request.additional_criteria)} criteria")
+    total_criteria = len(request.default_definitions) + len(request.custom_definitions)
+    logger.info(f"→ REQUEST: {len(request.transcription)} chars, {total_criteria} criteria ({len(request.default_definitions)} default, {len(request.custom_definitions)} custom), {len(request.negative_examples)} negative examples")
 
     if llm_instance is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
@@ -90,7 +91,9 @@ async def detect_extremist_content(request: DetectionRequest):
     try:
         initial_state = AgentState(
             transcription=request.transcription,
-            additional_criteria=request.additional_criteria
+            default_definitions=request.default_definitions,
+            custom_definitions=request.custom_definitions,
+            negative_examples=request.negative_examples
         )
 
         result = await graph.ainvoke(initial_state)

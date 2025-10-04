@@ -19,16 +19,19 @@ export const api = {
     name: string;
     description: string;
     files: File[];
-    extremismDefinition?: string;
+    defaultDefinitions?: string[];
+    customDefinitions?: string[];
+    negativeExamples?: string[];
   }): Promise<{ batch_id: string }> {
     const formData = new FormData();
     formData.append('name', batchData.name);
     formData.append('description', batchData.description);
-    
-    if (batchData.extremismDefinition) {
-      formData.append('extremism_definition', batchData.extremismDefinition);
-    }
-    
+
+    // Convert arrays to JSON strings
+    formData.append('default_definitions', JSON.stringify(batchData.defaultDefinitions || []));
+    formData.append('custom_definitions', JSON.stringify(batchData.customDefinitions || []));
+    formData.append('negative_examples', JSON.stringify(batchData.negativeExamples || []));
+
     batchData.files.forEach((file) => {
       formData.append('files', file);
     });

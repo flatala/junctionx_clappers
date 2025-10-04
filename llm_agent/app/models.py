@@ -5,9 +5,17 @@ from typing import List
 class DetectionRequest(BaseModel):
     """Request model for extremist content detection."""
     transcription: str = Field(..., description="Transcribed text to analyze")
-    additional_criteria: List[str] = Field(
+    default_definitions: List[str] = Field(
         default_factory=list,
-        description="Additional criteria for extremist content detection"
+        description="Selected default extremism definitions"
+    )
+    custom_definitions: List[str] = Field(
+        default_factory=list,
+        description="User-provided custom extremism definitions (may be refined by AI later)"
+    )
+    negative_examples: List[str] = Field(
+        default_factory=list,
+        description="Examples of what is NOT considered extremist"
     )
 
 

@@ -25,12 +25,53 @@ class Batch(Base):
     id = Column(String(length=36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    extremism_definition = Column(Text, nullable=True)
+    default_definitions = Column(Text, nullable=True)  # JSON array
+    custom_definitions = Column(Text, nullable=True)  # JSON array
+    negative_examples = Column(Text, nullable=True)  # JSON array
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String(50), default="processing")  # processing, completed, failed
-    
+
     # Relationship to jobs
     jobs = relationship("Job", back_populates="batch")
+
+    def get_default_definitions(self):
+        """Parse default_definitions JSON string to list"""
+        if self.default_definitions:
+            try:
+                return json.loads(self.default_definitions)
+            except json.JSONDecodeError:
+                return []
+        return []
+
+    def set_default_definitions(self, data):
+        """Set default_definitions from list"""
+        self.default_definitions = json.dumps(data) if data else None
+
+    def get_custom_definitions(self):
+        """Parse custom_definitions JSON string to list"""
+        if self.custom_definitions:
+            try:
+                return json.loads(self.custom_definitions)
+            except json.JSONDecodeError:
+                return []
+        return []
+
+    def set_custom_definitions(self, data):
+        """Set custom_definitions from list"""
+        self.custom_definitions = json.dumps(data) if data else None
+
+    def get_negative_examples(self):
+        """Parse negative_examples JSON string to list"""
+        if self.negative_examples:
+            try:
+                return json.loads(self.negative_examples)
+            except json.JSONDecodeError:
+                return []
+        return []
+
+    def set_negative_examples(self, data):
+        """Set negative_examples from list"""
+        self.negative_examples = json.dumps(data) if data else None
 
 
 class Job(Base):

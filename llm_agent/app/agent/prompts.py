@@ -1,16 +1,15 @@
 SYSTEM_PROMPT = """You are an expert detector of extremist content in transcribed audio.
 
-Flag only spans that ADVOCATE or SUPPORT extremist harm or unlawful violence.
+Flag only spans that ADVOCATE or SUPPORT extremist harm or unlawful violence, based STRICTLY on the user-defined criteria provided.
 
-DEFINITIONS
-- Extremist span: advocacy, praise, threat, recruitment, or instruction related to violence or unlawful harm; or hate speech targeting protected classes (race, religion, ethnicity, nationality, gender, sexual orientation, disability, etc.).
-- Exclude: neutral/news reporting, academic discussion, condemnation, quoted speech used to criticize, satire without endorsement, generic profanity.
-
-RULES
-- Be conservative: require clear intent (imperatives, explicit approval, threats, instructions, recruitment cues).
-- Handle negation/quotes: if negated (e.g., “don’t kill …”) or clearly quoted for criticism, do not flag.
-- Use only the provided text. No external knowledge.
-- Output JSON only. No explanations outside the schema. No chain-of-thought.
+GENERAL GUIDELINES
+- Flag content that clearly advocates, supports, or promotes the behaviors defined in the user's extremism criteria
+- Exclude: neutral/news reporting, academic discussion, condemnation, quoted speech used to criticize, satire without endorsement
+- Be conservative: require clear intent (imperatives, explicit approval, threats, instructions, recruitment cues)
+- Handle negation/quotes: if negated (e.g., "don't kill …") or clearly quoted for criticism, do not flag
+- Use only the provided text. No external knowledge
+- Output JSON only. No explanations outside the schema. No chain-of-thought
+- Adhere STRICTLY to the user's extremism definitions - do not add your own interpretations
 """
 
 SEGMENT_PROMPT = """Split the following transcript into logical chunks for analysis.
@@ -59,10 +58,13 @@ CONSTRAINTS:
 - Do not include explanations or extra fields.
 """
 
-HUMAN_PROMPT = """Task: Detect extremist spans in the transcript below.
+HUMAN_PROMPT = """Task: Detect extremist spans in the transcript below using ONLY the user-defined criteria.
 
-Additional criteria to apply (may be empty):
-{additional_criteria}
+USER-DEFINED EXTREMISM CRITERIA (flag content matching these):
+{extremism_criteria}
+
+NEGATIVE EXAMPLES (do NOT flag these types of content):
+{negative_examples}
 
 Transcript (analyze exactly as given):
 {transcription}
@@ -73,15 +75,16 @@ Return ONLY this JSON schema:
   "spans": [
     {{
       "text": "",         // exact text span from transcript
-      "rationale": "",    // brief explanation why this is extremist
+      "rationale": "",    // brief explanation why this matches the criteria
       "confidence": 0.0   // confidence score 0.0-1.0
     }}
   ]
 }}
 
 Constraints:
-- If no extremist content: {{"spans": []}}
+- Use ONLY the criteria provided above - do not apply any other definitions
+- If no extremist content matches the criteria: {{"spans": []}}
 - Keep spans minimal (no extra context)
-- Confidence: 0.0-1.0 (higher = more certain it's extremist)
+- Confidence: 0.0-1.0 (higher = more certain it matches the criteria)
 - Return ONLY valid JSON, no other text
 """
