@@ -1,13 +1,16 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from .agent_state import AgentState
-from typing import Optional
+from typing import Optional, List, Dict
 from .config import AgentConfiguration as Configuration
 from langchain_core.runnables import RunnableConfig
 from .utils import get_llm
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+_SENTENCE_RE = re.compile(r'.+?(?:[\.!\?;:](?=\s|$)|$)', re.DOTALL)
 
 async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Refine user-provided custom criteria using LLM (for future use)."""
@@ -28,25 +31,81 @@ async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig]
         logger.exception("Criteria refinement failed, using original")
         return {"refined_criteria": state.custom_definitions}
 
-async def segment_transcription(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
-    """Segment long transcriptions into logical chunks."""
+def _sentences(text: str) -> List[str]:
+    return [m.group(0).strip() for m in _SENTENCE_RE.finditer(text) if m.group(0).strip()]
+
+def _split_overlong(s: str, max_len: int) -> List[str]:
+    """Split a single overlong segment into <= max_len chunks (prefer word boundaries)."""
+    if len(s) <= max_len:
+        return [s]
+    parts, cur = [], ""
+    for word in s.split():
+        sep = "" if not cur else " "
+        if len(cur) + len(sep) + len(word) <= max_len:
+            cur += sep + word
+        else:
+            if cur:
+                parts.append(cur)
+                cur = ""
+            # word itself may be longer than max_len -> hard-cut
+            if len(word) > max_len:
+                start = 0
+                while start < len(word):
+                    parts.append(word[start:start+max_len])
+                    start += max_len
+            else:
+                cur = word
+    if cur:
+        parts.append(cur)
+    return parts
+
+def _merge(sentences: List[str], max_len: int) -> List[str]:
+    chunks, cur = [], ""
+    for s in sentences:
+        s = s.strip()
+        if not s:
+            continue
+        candidate = s if not cur else (cur + (" " if not cur.endswith(" ") else "") + s)
+        if len(candidate) <= max_len:
+            cur = candidate
+        else:
+            if cur:
+                chunks.append(cur)
+                cur = ""
+            # s might itself exceed max_len
+            if len(s) > max_len:
+                chunks.extend(_split_overlong(s, max_len))
+            else:
+                cur = s
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+async def segment_transcription(state: "AgentState", *, config: Optional["RunnableConfig"] = None) -> Dict:
+    """
+    Segment long transcriptions into logical chunks without LLM:
+    split on punctuation, then merge sequentially up to max_segment_length.
+    """
     cfg = Configuration.from_runnable_config(config)
-    trans_len = len(state.transcription)
+    text = (state.transcription or "").strip()
+    trans_len = len(text)
+
+    if not text:
+        logger.info("→ SEGMENT: empty transcription → 0 segments")
+        return {"transcription_segments": []}
 
     if trans_len <= cfg.max_segment_length:
         logger.info(f"→ SEGMENT: {trans_len} chars → 1 segment (threshold: {cfg.max_segment_length})")
-        return {"transcription_segments": [state.transcription]}
+        return {"transcription_segments": [text]}
 
     try:
-        messages = [HumanMessage(content=cfg.segmentation_prompt.format(transcription=state.transcription))]
-        response = await get_llm().ainvoke(messages)
-        segments = json.loads(response.content).get("segments", [state.transcription])
-
+        sents = _sentences(text)
+        segments = _merge(sents, cfg.max_segment_length)
         logger.info(f"→ SEGMENT: {trans_len} chars → {len(segments)} segments (threshold: {cfg.max_segment_length})")
         return {"transcription_segments": segments}
     except Exception:
         logger.exception("Segmentation failed, using single segment")
-        return {"transcription_segments": [state.transcription]}
+        return {"transcription_segments": [text]}
 
 async def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Detect extremist content in parallel batches."""
