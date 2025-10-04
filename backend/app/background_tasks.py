@@ -92,7 +92,7 @@ def find_matching_spans(transcribed_patches: dict, llm_spans: list):
 
 
 def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session):
-
+    
     job = db.get(Job, job_id)
     job.status = "transcribing"
     db.commit()
@@ -134,5 +134,4 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     job = db.get(Job, job_id)
     job.status = "done"
     db.commit()
-
     db.close()
