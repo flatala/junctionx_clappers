@@ -9,6 +9,24 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
+    """Refine user-provided criteria using LLM."""
+    if not state.additional_criteria:
+        return {"refined_criteria": []}
+
+    cfg = Configuration.from_runnable_config(config)
+    criteria_text = "\n".join(f"- {criterion}" for criterion in state.additional_criteria)
+
+    try:
+        messages = [HumanMessage(content=cfg.criteria_refinement_prompt.format(additional_criteria=criteria_text))]
+        response = await get_llm().ainvoke(messages)
+        refined = json.loads(response.content).get("criteria", [])
+
+        logger.info(f"→ REFINE: {len(state.additional_criteria)} criteria → {len(refined)} refined")
+        return {"refined_criteria": refined}
+    except Exception:
+        logger.exception("Criteria refinement failed, using original")
+        return {"refined_criteria": state.additional_criteria}
 
 async def segment_transcription(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Segment long transcriptions into logical chunks."""
@@ -29,26 +47,6 @@ async def segment_transcription(state: AgentState, *, config: Optional[RunnableC
     except Exception:
         logger.exception("Segmentation failed, using single segment")
         return {"transcription_segments": [state.transcription]}
-
-
-async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
-    """Refine user-provided criteria using LLM."""
-    if not state.additional_criteria:
-        return {"refined_criteria": []}
-
-    cfg = Configuration.from_runnable_config(config)
-    criteria_text = "\n".join(f"- {criterion}" for criterion in state.additional_criteria)
-
-    try:
-        messages = [HumanMessage(content=cfg.criteria_refinement_prompt.format(additional_criteria=criteria_text))]
-        response = await get_llm().ainvoke(messages)
-        refined = json.loads(response.content).get("criteria", [])
-
-        logger.info(f"→ REFINE: {len(state.additional_criteria)} criteria → {len(refined)} refined")
-        return {"refined_criteria": refined}
-    except Exception:
-        logger.exception("Criteria refinement failed, using original")
-        return {"refined_criteria": state.additional_criteria}
 
 async def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Detect extremist content in parallel batches."""
