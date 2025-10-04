@@ -3,19 +3,43 @@ import tempfile
 import shutil
 from pathlib import Path
 from app.transcribe import convert_video_to_audio, split_audio_to_patches, transcribe_patches
-import os
+import os, platform
 from faster_whisper import WhisperModel
 from app.models import Job
 import requests
 import string
 import json
 
-
-# Load Whisper model only once
 MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
-print(f"[INFO] Loading Whisper model: {MODEL_SIZE}")
-whisper_model = WhisperModel(MODEL_SIZE, device="cuda", compute_type="float16")
-print("[INFO] Whisper model loaded.")
+
+def load_whisper():
+    preferred = os.getenv("WHISPER_DEVICE")  # cuda | metal | cpu (optional)
+
+    if preferred:
+        ct_default = {"cuda": "float16", "metal": "float16", "cpu": "int8"}.get(preferred, "int8")
+        candidates = [(preferred, os.getenv("WHISPER_COMPUTE", ct_default))]
+    else:
+        candidates = [
+            ("cuda",  "float16"),
+            ("metal", "float16") if platform.system() == "Darwin" else None,
+            ("cpu",   os.getenv("WHISPER_COMPUTE", "int8")),
+        ]
+        candidates = [c for c in candidates if c]
+
+    last_err = None
+    for device, compute in candidates:
+        try:
+            print(f"[INFO] Loading Whisper model: {MODEL_SIZE} (device={device}, compute={compute})")
+            model = WhisperModel(MODEL_SIZE, device=device, compute_type=compute)
+            print("[INFO] Whisper model loaded.")
+            return model
+        except Exception as e:
+            print(f"[WARN] Failed on {device} ({compute}): {e}")
+            last_err = e
+
+    raise RuntimeError(f"Whisper init failed. Last error: {last_err}")
+
+whisper_model = load_whisper()
 
 
 def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
