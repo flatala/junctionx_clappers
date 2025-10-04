@@ -14,16 +14,6 @@ import os
 import json
 
 router = routing.APIRouter()
-# app = FastAPI()
-#
-# # Allow CORS for browser-based clients
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 # Load Whisper model only once
 MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
@@ -102,23 +92,6 @@ def transcribe_patches(patches, model):
     return all_results
 
 
-def convert_to_wav(input_audio_path: str, output_audio_path: str) -> str:
-    """Convert audio file to WAV format using ffmpeg."""
-    input_audio_path = Path(input_audio_path)
-    output_audio_path = Path(output_audio_path)
-    output_audio_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        print(f"[INFO] Converting audio to WAV: {input_audio_path}")
-        stream = ffmpeg.input(str(input_audio_path))
-        stream = ffmpeg.output(stream, str(output_audio_path), acodec='pcm_s16le', ac=1, ar='16k')
-        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-        print(f"[INFO] Converted to WAV: {output_audio_path}")
-        return str(output_audio_path)
-    except Exception as e:
-        print(f"[ERROR] Error converting audio: {e}")
-        raise
-
-
 @router.post("/transcribe")
 async def transcribe(
     file: UploadFile = File(...),
@@ -135,18 +108,10 @@ async def transcribe(
             audio_path = Path(tmpdir) / (input_path.stem + '.wav')
             convert_video_to_audio(str(input_path), str(audio_path))
         else:
-            # Convert unsupported audio formats (like m4a) to WAV
-            if input_path.suffix.lower() not in ['.wav', '.flac', '.ogg']:
-                wav_path = Path(tmpdir) / (input_path.stem + ".wav")
-                audio_path = convert_to_wav(str(input_path), str(wav_path))
-            else:
-                audio_path = input_path
+            audio_path = input_path
         # Split audio
         patches = split_audio_to_patches(str(audio_path), patch_duration_sec, overlap_sec)
         # Transcribe
         all_results = transcribe_patches(patches, whisper_model)
         return all_results
 
-
-# if __name__ == "__main__":
-#     uvicorn.run("ai_pipeline.api:app", host="0.0.0.0", port=8000, reload=True)
