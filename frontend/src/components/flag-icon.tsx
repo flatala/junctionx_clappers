@@ -8,9 +8,9 @@ interface FlagIconProps {
 }
 
 const flagIconMap = {
-  neutral: Sun,        // Clear skies - no issues
-  mild: Cloud,         // Cloudy - minor issues
-  extremist: Zap,      // Lightning - major issues
+  neutral: Sun,        // Clean content - no issues detected
+  mild: Cloud,         // Minor issues - mild language or concerns
+  extremist: Zap,      // Harmful content - extremist or toxic speech
 } as const;
 
 export default function FlagIcon({ flag, className = "h-4 w-4" }: FlagIconProps) {

@@ -11,7 +11,7 @@ export default function TimelineVisualization({ totalDuration }: TimelineVisuali
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-5 w-5" />
-          Storm Timeline
+          Content Timeline
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -31,15 +31,15 @@ export default function TimelineVisualization({ totalDuration }: TimelineVisuali
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-primary rounded"></div>
-              <span>Clear Skies</span>
+              <span>Clean Content</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-secondary rounded"></div>
-              <span>Light Storm</span>
+              <span>Minor Issues</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-destructive rounded"></div>
-              <span>Thunder Strike</span>
+              <span>Harmful Content</span>
             </div>
           </div>
         </div>

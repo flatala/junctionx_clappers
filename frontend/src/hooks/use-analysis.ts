@@ -2,13 +2,13 @@ import { useState } from 'react';
 import type { TranscriptSegment } from '../components/transcript-view';
 
 const progressStages = [
-  'Gathering storm clouds...',
-  'Channeling thunder energy...',
-  'Lightning transcription in progress...',
-  'Perun analyzes the content...',
-  'Detecting thunder strikes...',
-  'Forging the final report...',
-  'Thunder has spoken!'
+  'Initializing analysis...',
+  'Processing audio content...',
+  'Generating transcript...',
+  'Analyzing content for harmful speech...',
+  'Identifying problematic segments...',
+  'Compiling final report...',
+  'Analysis complete!'
 ];
 
 export function useAnalysis() {

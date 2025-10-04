@@ -38,13 +38,13 @@ const getFlagBgVariant = (flag: FlagType) => {
 const getFlagLabel = (flag: FlagType) => {
   switch (flag) {
     case 'neutral':
-      return 'CLEAR';
+      return 'CLEAN';
     case 'mild':
-      return 'STORM';
+      return 'MINOR';
     case 'extremist':
-      return 'THUNDER';
+      return 'HARMFUL';
     default:
-      return 'CLEAR';
+      return 'CLEAN';
   }
 };
 
@@ -83,7 +83,7 @@ export default function TranscriptSegmentItem({
       {explanation && (
         <div className="bg-muted/50 rounded-md p-3 border-l-2 border-muted-foreground/20">
           <p className="text-sm text-muted-foreground italic leading-relaxed">
-            <strong className="font-medium not-italic">Perun's Analysis:</strong> {explanation}
+            <strong className="font-medium not-italic">Analysis:</strong> {explanation}
           </p>
         </div>
       )}
