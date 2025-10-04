@@ -46,7 +46,7 @@ def transcribe_patches(patches, model):
     all_results = []
     for i, patch_path in enumerate(patches):
         print(f"[INFO] Transcribing patch {i}: {patch_path}")
-        result = model.transcribe(patch_path, word_timestamps=True, verbose=False)
+        result = model.transcribe(patch_path, word_timestamps=True, verbose=False, fp16=False)
         lang = result.get('language', 'unknown')
         words = []
         word_id = 0

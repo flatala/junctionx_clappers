@@ -65,7 +65,7 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
 
     transcribed_text = transcribed_patches[0]["patch_text"].strip()
 
-    print(transcribed_patches)
+    # print(transcribed_patches)
 
     processed_text = send_to_llm(transcribed_text)
 
