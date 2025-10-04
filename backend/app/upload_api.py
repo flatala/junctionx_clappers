@@ -1,17 +1,12 @@
-from fastapi import FastAPI, File, UploadFile, Form, routing
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import File, UploadFile, Form, routing, BackgroundTasks
 from pathlib import Path
 import shutil
 import tempfile
-import uvicorn
 import whisper
 import ffmpeg
-import numpy as np
 import soundfile as sf
 import librosa
 import os
-import json
 
 router = routing.APIRouter()
 
