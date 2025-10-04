@@ -2,6 +2,7 @@ import FileUploader from './components/file-uploader';
 import ProgressSection from './components/progress-section';
 import TranscriptView from './components/transcript-view';
 import SummaryPanel from './components/summary-panel';
+import AnalysisOverview from './components/analysis-overview';
 import AppHeader from './components/app-header';
 import AppFooter from './components/app-footer';
 import EmptyState from './components/empty-state';
@@ -24,7 +25,7 @@ export default function PerunApp() {
     clearError,
   } = useAnalysis();
 
-  const { mockSummaryData, handleDownloadJson, handleDownloadCsv } = useExport(
+  const { summaryData, handleDownloadJson, handleDownloadCsv } = useExport(
     selectedFile,
     transcriptSegments
   );
@@ -59,7 +60,7 @@ export default function PerunApp() {
 
             {showResults && (
               <SummaryPanel
-                summaryData={mockSummaryData}
+                summaryData={summaryData}
                 isVisible={showResults}
                 onDownloadJson={handleDownloadJson}
                 onDownloadCsv={handleDownloadCsv}
@@ -67,12 +68,18 @@ export default function PerunApp() {
             )}
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             {showResults ? (
-              <TranscriptView
-                segments={transcriptSegments}
-                isVisible={showResults}
-              />
+              <>
+                <AnalysisOverview 
+                  segments={transcriptSegments}
+                />
+                <TranscriptView
+                  segments={transcriptSegments}
+                  isVisible={showResults}
+                  audioFile={selectedFile || undefined}
+                />
+              </>
             ) : (
               <EmptyState />
             )}
