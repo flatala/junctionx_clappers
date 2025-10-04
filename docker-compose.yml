@@ -17,6 +17,37 @@ services:
     networks:
       - junctionx_network
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: junctionx_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - mysql
+    environment:
+      DATABASE_URL: mysql+pymysql://user:password@mysql:3306/junctionx_db
+    networks:
+      - junctionx_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: junctionx_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - junctionx_network
+
   language_agent:
     build:
       context: ./llm_agent
