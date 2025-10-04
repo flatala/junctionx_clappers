@@ -10,7 +10,7 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
-def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
+async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """
     Node that refines user-provided additional criteria using LLM.
 
@@ -39,7 +39,7 @@ def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = Non
         logger.info("Invoking LLM to refine criteria...")
         try:
             llm = get_llm()
-            response = llm.invoke(messages)
+            response = await llm.ainvoke(messages)
             logger.debug(f"LLM response for criteria refinement: {response.content[:500]}")
             parsed_response = json.loads(response.content)
             refined = parsed_response.get("criteria", [])
@@ -58,7 +58,7 @@ def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = Non
 
 
 
-def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
+async def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """
     Node that calls LLM to detect extremist content.
 
@@ -97,7 +97,7 @@ def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = 
 
     try:
         llm = get_llm()
-        response = llm.invoke(messages)
+        response = await llm.ainvoke(messages)
         logger.info("LLM content check completed")
         logger.debug(f"LLM response preview: {response.content[:500]}")
 

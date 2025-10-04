@@ -13,10 +13,10 @@ def get_llm() -> ChatOllama:
         _llm_instance = ChatOllama(
             model=model_name,
             temperature=0,
-            format="json",  # Request JSON output
-            num_ctx=4096,  # Context window size
-            num_predict=2048,  # Max tokens to generate
-            top_p=0.9,  # Nucleus sampling
-            repeat_penalty=1.1,  # Penalize repetitions
+            format="json",
+            num_ctx=4096,
+            num_predict=2048,
+            top_p=0.9,
+            repeat_penalty=1.1,
         )
     return _llm_instance

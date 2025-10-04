@@ -104,7 +104,7 @@ async def detect_extremist_content(request: DetectionRequest):
 
         # Run the graph
         logger.info("Starting graph execution...")
-        result = graph.invoke(initial_state)
+        result = await graph.ainvoke(initial_state)
         logger.info("Graph execution completed")
 
         # Parse the response
