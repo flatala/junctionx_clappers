@@ -79,7 +79,7 @@ async def transcribe(
             db.refresh(job)
             background_tasks.add_task(
                 main_background_function,
-                job.id,
+                str(job.id),
                 str(original_path),
                 patch_duration_sec,
                 overlap_sec,

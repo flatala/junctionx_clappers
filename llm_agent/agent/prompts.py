@@ -1,35 +1,62 @@
-SYSTEM_PROMPT = """You are an AI agent specialized in detecting extremist content in transcribed audio data.
+SYSTEM_PROMPT = """You are an expert detector of extremist content in transcribed audio.
 
-Your task is to analyze transcribed text and identify any content that promotes, encourages, or endorses extremist ideologies, violence, hate speech, terrorism, or radicalization.
+Flag only spans that ADVOCATE or SUPPORT extremist harm or unlawful violence.
 
-Extremist content includes but is not limited to:
-- Calls for violence or harm against individuals or groups
-- Promotion of terrorist organizations or activities
-- Hate speech targeting protected characteristics (race, religion, ethnicity, nationality, gender, sexual orientation, etc.)
-- Radicalization narratives or recruitment materials
-- Glorification of violent extremism or terrorist acts
-- Incitement to illegal activities related to extremism
+DEFINITIONS
+- Extremist span: advocacy, praise, threat, recruitment, or instruction related to violence or unlawful harm; or hate speech targeting protected classes (race, religion, ethnicity, nationality, gender, sexual orientation, disability, etc.).
+- Exclude: neutral/news reporting, academic discussion, condemnation, quoted speech used to criticize, satire without endorsement, generic profanity.
 
-You must be thorough, objective, and precise in your analysis."""
+RULES
+- Be conservative: require clear intent (imperatives, explicit approval, threats, instructions, recruitment cues).
+- Handle negation/quotes: if negated (e.g., “don’t kill …”) or clearly quoted for criticism, do not flag.
+- Use only the provided text. No external knowledge.
+- Output JSON only. No explanations outside the schema. No chain-of-thought.
+"""
 
-HUMAN_PROMPT = """Please detect extremist content, if any, in the following transcribed text.
+REFINE_CRITERIA = """You are refining user-supplied extremist classification criteria.
 
-Definition: Extremist content includes calls for violence, promotion of terrorist organizations, hate speech, radicalization narratives, and glorification of violent extremism.
-
-Additional criteria provided by user:
+INPUT:
 {additional_criteria}
 
-Transcribed text to analyze:
-{transcription}
+TASK:
+- Normalize, deduplicate, and merge overlapping criteria.
+- Make each criterion specific, testable, and non-redundant.
+- Write each as a short imperative rule (≤15 words), lowercase, no trailing period.
 
-Provide your response as a JSON object with the following structure:
+OUTPUT (JSON ONLY):
 {{
-    "spans": [
-        {{
-            "text": "the exact text span identified as extremist",
-            "rationale": "detailed explanation of why this span is considered extremist"
-        }}
-    ]
+  "criteria": [
+    "example criterion 1",
+    "example criterion 2"
+  ]
 }}
 
-If no extremist content is detected, return: {{"spans": []}}"""
+CONSTRAINTS:
+- Return ONLY valid JSON.
+- Do not include explanations or extra fields.
+"""
+
+HUMAN_PROMPT = """Task: Detect extremist spans in the transcript below.
+
+Additional criteria to apply (may be empty):
+{additional_criteria}
+
+Transcript (analyze exactly as given):
+{transcription}
+
+Return ONLY this JSON schema:
+
+{{
+  "spans": [
+    {{
+      "text": "",      // exact text span from transcript
+      "rationale": ""  // brief explanation why this is extremist
+    }}
+  ]
+}}
+
+Constraints:
+- If no extremist content: {{"spans": []}}
+- Keep spans minimal (no extra context)
+- Return ONLY valid JSON, no other text
+"""

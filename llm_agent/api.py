@@ -2,12 +2,20 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import json
+import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from agent.graph import graph
 from agent.agent_state import AgentState
 from agent.utils import get_llm
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Global LLM instance
 llm_instance = None
@@ -37,20 +45,21 @@ class DetectionResponse(BaseModel):
 async def lifespan(app: FastAPI):
     """Lifespan event to pre-load the model on startup."""
     global llm_instance
-    print("Starting up: Loading Qwen model...")
+    logger.info("Starting up: Loading LLM model...")
     try:
         llm_instance = get_llm()
-        print("Qwen model loaded successfully!")
+        logger.info("LLM model loaded successfully!")
     except Exception as e:
-        print(f"Error loading model: {e}")
+        logger.error(f"Error loading model: {e}")
+        logger.error(traceback.format_exc())
         raise
     yield
-    print("Shutting down...")
+    logger.info("Shutting down...")
 
 
 app = FastAPI(
     title="Extremist Content Detection API",
-    description="Microservice for detecting extremist content in transcribed audio data using Qwen LLM",
+    description="Microservice for detecting extremist content in transcribed audio data using Ollama LLM",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -77,7 +86,13 @@ async def detect_extremist_content(request: DetectionRequest):
     Returns:
         Detection response with identified extremist spans
     """
+    logger.info(
+        f"Received detection request - transcription length: {len(request.transcription)}, "
+        f"additional criteria count: {len(request.additional_criteria)}"
+    )
+
     if llm_instance is None:
+        logger.error("Model not loaded yet")
         raise HTTPException(status_code=503, detail="Model not loaded yet")
 
     try:
@@ -88,10 +103,13 @@ async def detect_extremist_content(request: DetectionRequest):
         )
 
         # Run the graph
-        result = graph.invoke(initial_state)
+        logger.info("Starting graph execution...")
+        result = await graph.ainvoke(initial_state)
+        logger.info("Graph execution completed")
 
         # Parse the response
         try:
+            logger.debug(f"Raw LLM response: {result.get('response', 'N/A')[:500]}")
             parsed_response = json.loads(result["response"])
 
             # Validate and convert to response model
@@ -99,12 +117,26 @@ async def detect_extremist_content(request: DetectionRequest):
                 ExtremistSpan(**span) for span in parsed_response.get("spans", [])
             ]
 
+            logger.info(f"Successfully detected {len(spans)} extremist spans")
             return DetectionResponse(spans=spans)
-        except json.JSONDecodeError:
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing failed: {e}")
+            logger.error(f"Raw response that failed to parse: {result.get('response', 'N/A')}")
+            logger.error(traceback.format_exc())
             # If JSON parsing fails, return empty spans
             return DetectionResponse(spans=[])
+        except (KeyError, TypeError, ValueError) as e:
+            logger.error(f"Error processing response structure: {e}")
+            logger.error(f"Response data: {result}")
+            logger.error(traceback.format_exc())
+            return DetectionResponse(spans=[])
 
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Unexpected error during detection: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error during detection: {str(e)}")
 
 

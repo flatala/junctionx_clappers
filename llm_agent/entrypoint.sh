@@ -18,9 +18,9 @@ for i in {1..30}; do
     sleep 2
 done
 
-# Pull the Qwen model
-echo "Pulling qwen3:8b model..."
-ollama pull qwen3:8b
+# Pull the LLM model
+echo "Pulling model ${OLLAMA_MODEL}..."
+ollama pull ${OLLAMA_MODEL}
 
 echo "Model ready! Starting FastAPI server..."
 

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.test_user import router as user_router
 from app.upload_api import router as upload_router
+from app.retrieve import router as retrieve_router
 # from whisper_processing import process_audio_file
 
 
@@ -32,6 +33,7 @@ app.add_middleware(
 
 app.include_router(router=user_router, prefix="/users", tags=["Users"])
 app.include_router(router=upload_router, prefix="/upload", tags=["Upload"])
+app.include_router(router=retrieve_router, prefix="/retrieve", tags=["Retrieve"])
 
 
 @app.get("/")

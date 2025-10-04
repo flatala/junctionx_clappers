@@ -3,7 +3,7 @@
 set -e
 
 ENV_NAME="llm_agent"
-MODEL_NAME="qwen3:8b"
+MODEL_NAME="${OLLAMA_MODEL:-qwen3:8b}"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "==== LLM Agent Setup & Start ===="
@@ -50,7 +50,7 @@ fi
 
 # Pull model if needed
 if ! ollama list | grep -q "${MODEL_NAME}"; then
-    echo "Pulling ${MODEL_NAME}..."
+    echo "Pulling model ${MODEL_NAME}..."
     ollama pull ${MODEL_NAME}
 fi
 echo ""
