@@ -41,7 +41,8 @@ def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
         return all_results
 
 
-def send_to_llm(transcribed_text: str):
+def send_to_llm(transcribed_text: str, extremism_definition: str = None):
+    """Send transcribed text to LLM for analysis"""
     print("SENDING TO LLM")
     response = requests.post(
         "http://localhost:8001/detect",
