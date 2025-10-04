@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
-import { Upload, RefreshCw, X, FileAudio, Video, Clock } from 'lucide-react';
+import { Upload, RefreshCw, X, FileAudio, Video, Clock, Archive } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface FileUploaderProps {
@@ -21,12 +21,18 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const getFileIcon = (type: string) => {
+const getFileIcon = (type: string, name?: string) => {
   if (type.startsWith('video/')) return <Video className="h-8 w-8" />;
+  if (type === 'application/zip' || type === 'application/x-zip-compressed' || (name && name.toLowerCase().endsWith('.zip'))) {
+    return <Archive className="h-8 w-8 text-purple-500" />;
+  }
   return <FileAudio className="h-8 w-8" />;
 };
 
-const getFileTypeDescription = (type: string): string => {
+const getFileTypeDescription = (type: string, name?: string): string => {
+  if (type === 'application/zip' || type === 'application/x-zip-compressed' || (name && name.toLowerCase().endsWith('.zip'))) {
+    return 'ZIP Archive';
+  }
   if (type.includes('mp3')) return 'MP3 Audio';
   if (type.includes('wav')) return 'WAV Audio';
   if (type.includes('m4a')) return 'M4A Audio';
@@ -135,7 +141,9 @@ export default function FileUploader({
     event.preventDefault();
     setDragOver(false);
     const file = event.dataTransfer.files[0];
-    if (file && (file.type.startsWith('audio/') || file.type.startsWith('video/'))) {
+    if (file && (file.type.startsWith('audio/') || file.type.startsWith('video/') || 
+                 file.type === 'application/zip' || file.type === 'application/x-zip-compressed' ||
+                 file.name.toLowerCase().endsWith('.zip'))) {
       onFileSelect(file);
     }
   };
@@ -183,7 +191,7 @@ export default function FileUploader({
                   Drop your file here or click to browse
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports MP3, WAV, MP4 and other audio/video files
+                  Supports MP3, WAV, MP4, ZIP archives and other audio/video files
                 </p>
               </div>
             </div>
@@ -191,7 +199,7 @@ export default function FileUploader({
             // File Selected State
             <div className="flex items-start gap-3">
               <div className="text-muted-foreground mt-1">
-                {getFileIcon(selectedFile.type)}
+                {getFileIcon(selectedFile.type, selectedFile.name)}
               </div>
               <div className="flex-1 min-w-0 space-y-2">
                 <p className="font-medium truncate" title={selectedFile.name}>
@@ -200,7 +208,7 @@ export default function FileUploader({
                 
                 <div className="grid grid-cols-1 gap-1 text-sm text-muted-foreground">
                   <div className="flex items-center justify-between">
-                    <span>{getFileTypeDescription(selectedFile.type)}</span>
+                    <span>{getFileTypeDescription(selectedFile.type, selectedFile.name)}</span>
                     <span>{formatFileSize(selectedFile.size)}</span>
                   </div>
                   
@@ -247,14 +255,14 @@ export default function FileUploader({
         <Input
           id="file-input"
           type="file"
-          accept=".mp3,.wav,.mp4,audio/*,video/*"
+          accept=".mp3,.wav,.mp4,.zip,audio/*,video/*,application/zip"
           onChange={handleFileChange}
           className="hidden"
         />
         <Input
           id="file-replace-input"
           type="file"
-          accept=".mp3,.wav,.mp4,audio/*,video/*"
+          accept=".mp3,.wav,.mp4,.zip,audio/*,video/*,application/zip"
           onChange={handleFileChange}
           className="hidden"
         />

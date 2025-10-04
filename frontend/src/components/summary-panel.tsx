@@ -1,5 +1,4 @@
 import SummaryTable from './summary-table';
-import ExportActions from './export-actions';
 
 interface SummaryData {
   totalDuration: string;
@@ -18,19 +17,12 @@ interface SummaryPanelProps {
 
 export default function SummaryPanel({ 
   summaryData, 
-  isVisible, 
-  onDownloadJson, 
-  onDownloadCsv 
-}: SummaryPanelProps) {
+  isVisible}: SummaryPanelProps) {
   if (!isVisible) return null;
 
   return (
     <div className="space-y-6">
       <SummaryTable summaryData={summaryData} />
-      <ExportActions 
-        onDownloadJson={onDownloadJson} 
-        onDownloadCsv={onDownloadCsv} 
-      />
     </div>
   );
 }
