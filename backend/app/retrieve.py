@@ -89,8 +89,8 @@ async def retrieve_status_and_processed(job_id: str, db: Session = Depends(get_d
 @router.get("/batch/{batch_id}", response_model=BatchResponse)
 async def get_batch(batch_id: str, db: Session = Depends(get_db)):
     """Get batch details including job information"""
-    batch = db.query(Batch).filter(Batch.id == batch_id).first()
-    if not batch:
+    batch = db.get(Batch, batch_id)
+    if batch is None:
         raise HTTPException(status_code=404, detail="Batch not found")
 
     jobs = []
