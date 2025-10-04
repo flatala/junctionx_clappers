@@ -1,41 +1,71 @@
 import type { TranscriptSegment } from '../components/transcript-view';
+import { useState, useEffect } from 'react';
 
-function generateSummaryData(segments: TranscriptSegment[]) {
-  const totalSegments = segments.length;
-  const flaggedSegments = segments.filter(s => s.flag !== 'neutral');
-  const extremistSegments = segments.filter(s => s.flag === 'extremist');
-  const mildSegments = segments.filter(s => s.flag === 'mild');
-  
-  // Estimate durations based on text length (rough approximation)
-  const totalEstimatedDuration = totalSegments * 5; // ~5 seconds per segment
-  const flaggedEstimatedDuration = flaggedSegments.length * 5;
-  const flaggedPercentage = totalSegments > 0 ? Math.round((flaggedSegments.length / totalSegments) * 100) : 0;
-  
-  // Determine risk level
-  let riskLevel: 'low' | 'medium' | 'high' = 'low';
-  if (extremistSegments.length > 0) {
-    riskLevel = 'high';
-  } else if (mildSegments.length > 1 || flaggedPercentage > 20) {
-    riskLevel = 'medium';
+async function generateSummaryData(segments: TranscriptSegment[], selectedFile: File | null) {
+  if (!selectedFile) {
+    // Return default/placeholder values when file isn't loaded yet
+    return {
+      totalDuration: '--:-- min',
+      flaggedDuration: '-- sec',
+      flaggedPercentage: 0,
+      segmentsFlagged: segments.length,
+    };
   }
+
+  const totalSegments = segments.length;
+  const flaggedSegments = segments;
   
+  let totalDurationSeconds = 0;
+  
+  try {
+    // Use HTML5 Audio API to get duration
+    const audio = new Audio();
+    const objectUrl = URL.createObjectURL(selectedFile);
+    
+    await new Promise<void>((resolve, reject) => {
+      audio.addEventListener('loadedmetadata', () => {
+        totalDurationSeconds = audio.duration;
+        URL.revokeObjectURL(objectUrl);
+        resolve();
+      });
+      
+      audio.addEventListener('error', () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Failed to load audio metadata'));
+      });
+      
+      audio.src = objectUrl;
+    });
+  } catch (error) {
+    console.error('Failed to get duration:', error);
+    totalDurationSeconds = segments.length * 5; // fallback to estimate
+  }
+
+  const flaggedEstimatedDuration = flaggedSegments.length;
+  const flaggedPercentage = totalSegments > 0 
+    ? Math.round((flaggedSegments.length /totalDurationSeconds) * 100) 
+    : 0;
+
   return {
-    totalDuration: `${Math.floor(totalEstimatedDuration / 60)}:${(totalEstimatedDuration % 60).toString().padStart(2, '0')} min`,
+    totalDuration: `${Math.floor(totalDurationSeconds / 60)}:${Math.floor(totalDurationSeconds % 60).toString().padStart(2, '0')} min`,
     flaggedDuration: `${flaggedEstimatedDuration} sec`,
     flaggedPercentage,
     segmentsFlagged: flaggedSegments.length,
-    riskLevel,
-    breakdown: {
-      total: totalSegments,
-      neutral: segments.filter(s => s.flag === 'neutral').length,
-      mild: mildSegments.length,
-      extremist: extremistSegments.length,
-    }
   };
 }
 
 export function useExport(selectedFile: File | null, transcriptSegments: TranscriptSegment[]) {
-  const summaryData = generateSummaryData(transcriptSegments);
+  const [summaryData, setSummaryData] = useState({
+    totalDuration: '--:-- min',
+    flaggedDuration: '-- sec',
+    flaggedPercentage: 0,
+    segmentsFlagged: 0,
+  });
+
+  useEffect(() => {
+    generateSummaryData(transcriptSegments, selectedFile).then(setSummaryData);
+  }, [selectedFile, transcriptSegments]);
+
   const handleDownloadJson = () => {
     const data = {
       file: selectedFile?.name,
@@ -43,7 +73,7 @@ export function useExport(selectedFile: File | null, transcriptSegments: Transcr
       summary: summaryData,
       segments: transcriptSegments,
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
