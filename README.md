@@ -1,44 +1,62 @@
 # junctionx_clappers
 
-A minimal FastAPI template with MySQL database integration.
+A full-stack application with FastAPI backend and React frontend.
+
+## Project Structure
+
+```
+junctionx_clappers/
+├── backend/               # FastAPI backend application
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py       # FastAPI application and endpoints
+│   │   ├── database.py   # Database configuration
+│   │   ├── models.py     # SQLAlchemy models
+│   │   ├── schemas.py    # Pydantic schemas
+│   │   └── test_user.py  # User endpoints
+│   ├── .env.example      # Example environment variables
+│   ├── docker-compose.yml # Docker Compose configuration
+│   └── requirements.txt  # Python dependencies
+├── frontend/             # React + Vite frontend application
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── lib/          # Utility functions
+│   │   ├── App.tsx       # Main App component
+│   │   └── main.tsx      # Entry point
+│   ├── package.json      # Node.js dependencies
+│   └── vite.config.ts    # Vite configuration
+└── README.md
+```
 
 ## Features
 
+### Backend
 - FastAPI web framework
 - MySQL database with SQLAlchemy ORM
 - CRUD operations for User model
 - Docker Compose for easy database setup
 - Environment-based configuration
 
-## Project Structure
+### Frontend
+- React 18 with TypeScript
+- Vite for fast development and building
+- Tailwind CSS for styling
+- shadcn/ui component library
+- Modern, responsive UI
 
-```
-junctionx_clappers/
-├── app/
-│   ├── __init__.py
-│   ├── main.py          # FastAPI application and endpoints
-│   ├── database.py      # Database configuration
-│   ├── models.py        # SQLAlchemy models
-│   └── schemas.py       # Pydantic schemas
-├── .env.example         # Example environment variables
-├── docker-compose.yml   # Docker Compose configuration
-├── requirements.txt     # Python dependencies
-└── README.md
-```
+## Prerequisites
+
+- Python 3.8+
+- Node.js 18+
+- Docker and Docker Compose (optional, for MySQL container)
 
 ## Setup
 
-### Prerequisites
+### Backend Setup
 
-- Python 3.8+
-- Docker and Docker Compose (optional, for MySQL container)
-
-### Installation
-
-1. Clone the repository:
+1. Navigate to the backend directory:
 ```bash
-git clone https://github.com/flatala/junctionx_clappers.git
-cd junctionx_clappers
+cd backend
 ```
 
 2. Create a virtual environment and activate it:
@@ -58,45 +76,40 @@ cp .env.example .env
 # Edit .env with your database credentials
 ```
 
-### Database Setup
-
-#### Using Docker Compose (Recommended)
-
-Start the MySQL container:
+5. Start the MySQL container:
 ```bash
 docker-compose up -d
 ```
 
-This will create a MySQL database with the following credentials:
-- Database: `junctionx_db`
-- User: `user`
-- Password: `password`
-- Port: `3306`
-
-#### Manual MySQL Setup
-
-If you have MySQL installed locally, create a database:
-```sql
-CREATE DATABASE junctionx_db;
-CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON junctionx_db.* TO 'user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-Update your `.env` file accordingly.
-
-## Running the Application
-
-Start the FastAPI server:
+6. Run the backend server:
 ```bash
 uvicorn app.main:app --reload
 ```
 
 The API will be available at `http://localhost:8000`
 
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Run the development server:
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
 ## API Documentation
 
-Once the server is running, visit:
+Once the backend server is running, visit:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
@@ -113,28 +126,21 @@ Once the server is running, visit:
 - `PUT /users/{user_id}` - Update a user
 - `DELETE /users/{user_id}` - Delete a user
 
-### Example Usage
-
-Create a user:
-```bash
-curl -X POST "http://localhost:8000/users" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "John Doe", "email": "john@example.com"}'
-```
-
-Get all users:
-```bash
-curl -X GET "http://localhost:8000/users"
-```
-
 ## Development
 
-The application uses:
+### Backend Stack
 - **FastAPI**: Modern, fast web framework for building APIs
 - **SQLAlchemy**: SQL toolkit and ORM
 - **Pydantic**: Data validation using Python type annotations
 - **PyMySQL**: Pure Python MySQL driver
 - **Uvicorn**: ASGI server implementation
+
+### Frontend Stack
+- **React**: UI library
+- **TypeScript**: Type-safe JavaScript
+- **Vite**: Build tool and dev server
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: Re-usable component library
 
 ## License
 
