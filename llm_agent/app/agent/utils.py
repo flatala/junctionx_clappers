@@ -18,5 +18,6 @@ def get_llm() -> ChatOllama:
             num_predict=2048,
             top_p=0.9,
             repeat_penalty=1.1,
+            keep_alive="24h"
         )
     return _llm_instance
