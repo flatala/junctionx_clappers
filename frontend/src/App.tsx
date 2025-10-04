@@ -11,15 +11,16 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <Router>
-        <div className="container mx-auto px-4 max-w-6xl">
           <AppHeader />
+            <div className='mx-auto px-4 max-w-6xl w-full flex-grow mb-16 min-h-screen'>
+
           <Routes>
             <Route path="/" element={<BatchListView />} />
             <Route path="/:batchId" element={<BatchDetailsView />} />
             <Route path="/:batchId/:jobId" element={<JobAnalysisView />} />
           </Routes>
+          </div>
           <AppFooter />
-        </div>
       </Router>
     </ThemeProvider>
   )

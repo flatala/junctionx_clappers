@@ -25,6 +25,15 @@ def extract_audio_from_zip(zip_file: UploadFile, extract_dir: Path) -> List[Path
             for file_info in zip_ref.filelist:
                 if not file_info.is_dir():
                     file_path = Path(file_info.filename)
+                    
+                    # Skip macOS metadata files and hidden files
+                    if file_path.name.startswith('._') or file_path.name.startswith('.'):
+                        continue
+                    
+                    # Skip __MACOSX directory files
+                    if '__MACOSX' in file_path.parts:
+                        continue
+                    
                     if file_path.suffix.lower() in audio_video_extensions:
                         # Extract to a safe filename
                         safe_filename = file_path.name.replace(" ", "_")

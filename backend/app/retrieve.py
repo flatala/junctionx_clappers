@@ -136,9 +136,19 @@ async def get_job_analysis(batch_id: str, job_id: str, db: Session = Depends(get
     spans = []
     if "spans" in analysis_data:
         for span in analysis_data["spans"]:
+            # Convert start/end to strings if they are floats
+            start = span.get("start", "00:00:00.000")
+            end = span.get("end", "00:00:00.000")
+            
+            # Convert float timestamps to string format
+            if isinstance(start, (int, float)):
+                start = str(start)
+            if isinstance(end, (int, float)):
+                end = str(end)
+            
             spans.append(AnalysisSpan(
-                start=span.get("start", "00:00:00.000"),
-                end=span.get("end", "00:00:00.000"),
+                start=start,
+                end=end,
                 text=span.get("text", ""),
                 rationale=span.get("rationale", "")
             ))
