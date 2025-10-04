@@ -2,7 +2,8 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.test_user import router as user_router
-from app.whisper_processing import process_audio_file
+from app.upload_api import router as upload_router
+# from whisper_processing import process_audio_file
 
 
 # Create database tables
@@ -29,7 +30,8 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-app.include_router(router=user_router, prefix="/users", tags=["users"])
+app.include_router(router=user_router, prefix="/users", tags=["Users"])
+app.include_router(router=upload_router, prefix="/upload", tags=["Upload"])
 
 
 @app.get("/")
@@ -50,8 +52,8 @@ def health_check():
     }
 
 
-@app.post("/upload-audio")
-async def process_audio(file: UploadFile = File(...)):
-    result = await process_audio_file(file)
-
-    return result
+# @app.post("/upload-audio")
+# async def process_audio(file: UploadFile = File(...)):
+#     result = await process_audio_file(file)
+#
+#     return result
