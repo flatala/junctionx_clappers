@@ -1,4 +1,3 @@
-import TimelineVisualization from './timeline-visualization';
 import SummaryTable from './summary-table';
 import ExportActions from './export-actions';
 
@@ -27,7 +26,6 @@ export default function SummaryPanel({
 
   return (
     <div className="space-y-6">
-      <TimelineVisualization totalDuration={summaryData.totalDuration} />
       <SummaryTable summaryData={summaryData} />
       <ExportActions 
         onDownloadJson={onDownloadJson} 

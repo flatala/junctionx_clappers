@@ -73,7 +73,6 @@ export default function PerunApp() {
               <>
                 <AnalysisOverview 
                   segments={transcriptSegments}
-                  summaryData={summaryData}
                 />
                 <TranscriptView
                   segments={transcriptSegments}
