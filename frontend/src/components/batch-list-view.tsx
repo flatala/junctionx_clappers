@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Trash2 } from 'lucide-react';
+import { Plus, Upload, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { api, type BatchDetails } from '@/lib/api';
 import { storage } from '@/lib/storage';
+import { DEFAULT_EXTREMISM_DEFINITIONS } from '@/lib/extremism-definitions';
 import BatchFileUploader from './batch-file-uploader';
 import ErrorAlert from './error-alert';
 import EmptyState from './empty-state';
@@ -23,7 +24,9 @@ export default function BatchListView() {
     name: '',
     description: '',
     files: [] as File[],
-    extremismDefinition: ''
+    defaultDefinitions: DEFAULT_EXTREMISM_DEFINITIONS,
+    customDefinitions: [''] as string[],
+    negativeExamples: [''] as string[]
   });
 
   useEffect(() => {
@@ -61,11 +64,23 @@ export default function BatchListView() {
 
     setIsUploading(true);
     try {
-      const result = await api.uploadBatch(formData);
+      // Filter out empty strings from custom definitions and negative examples
+      const result = await api.uploadBatch({
+        ...formData,
+        customDefinitions: formData.customDefinitions.filter(d => d.trim() !== ''),
+        negativeExamples: formData.negativeExamples.filter(e => e.trim() !== '')
+      });
       storage.addBatchId(result.batch_id);
-      
+
       // Reset form
-      setFormData({ name: '', description: '', files: [], extremismDefinition: '' });
+      setFormData({
+        name: '',
+        description: '',
+        files: [],
+        defaultDefinitions: DEFAULT_EXTREMISM_DEFINITIONS,
+        customDefinitions: [''],
+        negativeExamples: ['']
+      });
       setShowCreateForm(false);
       
       // Reload batches
@@ -147,20 +162,131 @@ export default function BatchListView() {
             </div>
 
             <div>
-              <label htmlFor="extremismDefinition" className="block text-sm font-medium mb-2">
-                Custom Extremism Definition
+              <label className="block text-sm font-medium mb-1">
+                Default Extremism Definitions
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Select the default definitions to use for extremism detection.
+              </p>
+              <div className="space-y-2">
+                {DEFAULT_EXTREMISM_DEFINITIONS.map((definition, index) => {
+                  const isChecked = formData.defaultDefinitions.includes(definition);
+                  return (
+                    <div key={index} className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id={`default-${index}`}
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const newDefaults = e.target.checked
+                            ? [...formData.defaultDefinitions, definition]
+                            : formData.defaultDefinitions.filter(d => d !== definition);
+                          setFormData({ ...formData, defaultDefinitions: newDefaults });
+                        }}
+                        className="mt-1 h-4 w-4"
+                      />
+                      <label htmlFor={`default-${index}`} className="text-sm flex-1 cursor-pointer">
+                        {definition}
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Custom Definitions
                 <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
               </label>
-              <Textarea
-                id="extremismDefinition"
-                value={formData.extremismDefinition}
-                onChange={(e) => setFormData({ ...formData, extremismDefinition: e.target.value })}
-                placeholder="Define what you consider extremist content for this analysis..."
-                rows={4}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Provide your own definition of extremism to guide the AI analysis. If left empty, the default definition will be used.
+              <div className="space-y-2">
+                {formData.customDefinitions.map((definition, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={definition}
+                      onChange={(e) => {
+                        const newCustom = [...formData.customDefinitions];
+                        newCustom[index] = e.target.value;
+                        setFormData({ ...formData, customDefinitions: newCustom });
+                      }}
+                      placeholder="Enter custom extremism definition..."
+                    />
+                    {formData.customDefinitions.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newCustom = formData.customDefinitions.filter((_, i) => i !== index);
+                          setFormData({ ...formData, customDefinitions: newCustom });
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFormData({
+                  ...formData,
+                  customDefinitions: [...formData.customDefinitions, '']
+                })}
+                className="mt-2"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Custom Definition
+              </Button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Negative Examples
+                <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
+              </label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Specify what should not be considered extremist content.
               </p>
+              <div className="space-y-2">
+                {formData.negativeExamples.map((example, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      value={example}
+                      onChange={(e) => {
+                        const newNegative = [...formData.negativeExamples];
+                        newNegative[index] = e.target.value;
+                        setFormData({ ...formData, negativeExamples: newNegative });
+                      }}
+                      placeholder="e.g., News reporting, Academic discussion..."
+                    />
+                    {formData.negativeExamples.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newNegative = formData.negativeExamples.filter((_, i) => i !== index);
+                          setFormData({ ...formData, negativeExamples: newNegative });
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFormData({
+                  ...formData,
+                  negativeExamples: [...formData.negativeExamples, '']
+                })}
+                className="mt-2"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Negative Example
+              </Button>
             </div>
 
             <div>

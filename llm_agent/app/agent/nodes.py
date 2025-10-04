@@ -10,23 +10,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
-    """Refine user-provided criteria using LLM."""
-    if not state.additional_criteria:
+    """Refine user-provided custom criteria using LLM (for future use)."""
+    if not state.custom_definitions:
         return {"refined_criteria": []}
 
     cfg = Configuration.from_runnable_config(config)
-    criteria_text = "\n".join(f"- {criterion}" for criterion in state.additional_criteria)
+    criteria_text = "\n".join(f"- {criterion}" for criterion in state.custom_definitions)
 
     try:
         messages = [HumanMessage(content=cfg.criteria_refinement_prompt.format(additional_criteria=criteria_text))]
         response = await get_llm().ainvoke(messages)
         refined = json.loads(response.content).get("criteria", [])
 
-        logger.info(f"→ REFINE: {len(state.additional_criteria)} criteria → {len(refined)} refined")
+        logger.info(f"→ REFINE: {len(state.custom_definitions)} custom criteria → {len(refined)} refined")
         return {"refined_criteria": refined}
     except Exception:
         logger.exception("Criteria refinement failed, using original")
-        return {"refined_criteria": state.additional_criteria}
+        return {"refined_criteria": state.custom_definitions}
 
 async def segment_transcription(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Segment long transcriptions into logical chunks."""
@@ -51,7 +51,13 @@ async def segment_transcription(state: AgentState, *, config: Optional[RunnableC
 async def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Detect extremist content in parallel batches."""
     cfg = Configuration.from_runnable_config(config)
-    criteria_text = "\n".join(f"- {c}" for c in state.additional_criteria) if state.additional_criteria else "None"
+
+    # Combine default and custom definitions
+    all_criteria = state.default_definitions + state.custom_definitions
+    extremism_criteria = "\n".join(f"- {c}" for c in all_criteria) if all_criteria else "None provided"
+
+    # Format negative examples
+    negative_examples = "\n".join(f"- {n}" for n in state.negative_examples) if state.negative_examples else "None provided"
 
     logger.info(f"→ BATCH: Processing {len(state.transcription_segments)} segments in parallel")
 
@@ -60,7 +66,11 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
         all_messages = [
             [
                 SystemMessage(content=cfg.system_prompt),
-                HumanMessage(content=cfg.human_prompt.format(transcription=seg, additional_criteria=criteria_text))
+                HumanMessage(content=cfg.human_prompt.format(
+                    transcription=seg,
+                    extremism_criteria=extremism_criteria,
+                    negative_examples=negative_examples
+                ))
             ]
             for seg in state.transcription_segments
         ]

@@ -5,6 +5,7 @@ from app.database import get_db
 import shutil
 import zipfile
 import tempfile
+import json
 from typing import List, Optional
 from app.models import Job, Batch
 from app.background_tasks import main_background_function
@@ -53,7 +54,9 @@ async def upload_batch(
     background_tasks: BackgroundTasks,
     name: str = Form(...),
     description: Optional[str] = Form(None),
-    extremism_definition: Optional[str] = Form(None),
+    default_definitions: str = Form("[]"),
+    custom_definitions: str = Form("[]"),
+    negative_examples: str = Form("[]"),
     files: List[UploadFile] = File(...),
     patch_duration_sec: int = Form(120),
     overlap_sec: int = Form(30),
@@ -68,12 +71,22 @@ async def upload_batch(
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(parents=True, exist_ok=True)
     
+    # Parse JSON strings to lists
+    try:
+        default_defs_list = json.loads(default_definitions)
+        custom_defs_list = json.loads(custom_definitions)
+        negative_examples_list = json.loads(negative_examples)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON in definitions: {str(e)}")
+
     # Create batch
     batch = Batch(
         name=name,
-        description=description,
-        extremism_definition=extremism_definition
+        description=description
     )
+    batch.set_default_definitions(default_defs_list)
+    batch.set_custom_definitions(custom_defs_list)
+    batch.set_negative_examples(negative_examples_list)
     db.add(batch)
     db.commit()
     db.refresh(batch)
@@ -135,7 +148,9 @@ async def upload_batch(
             patch_duration_sec,
             overlap_sec,
             db,
-            extremism_definition
+            default_defs_list,
+            custom_defs_list,
+            negative_examples_list
         )
     
     return {"batch_id": batch.id}

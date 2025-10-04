@@ -25,7 +25,9 @@ class BatchCreate(BaseModel):
     """Schema for creating a batch"""
     name: str
     description: Optional[str] = None
-    extremism_definition: Optional[str] = None
+    default_definitions: List[str] = []
+    custom_definitions: List[str] = []
+    negative_examples: List[str] = []
 
 
 class JobInfo(BaseModel):

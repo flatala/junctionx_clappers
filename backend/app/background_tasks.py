@@ -41,14 +41,16 @@ def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
         return all_results
 
 
-def send_to_llm(transcribed_text: str, extremism_definition: str = None):
+def send_to_llm(transcribed_text: str, default_definitions: list = None, custom_definitions: list = None, negative_examples: list = None):
     """Send transcribed text to LLM for analysis"""
     print("SENDING TO LLM")
     response = requests.post(
         "http://localhost:8001/detect",
         json={
             "transcription": transcribed_text,
-            "additional_criteria": []
+            "default_definitions": default_definitions or [],
+            "custom_definitions": custom_definitions or [],
+            "negative_examples": negative_examples or []
         }
     )
 
@@ -92,7 +94,7 @@ def find_matching_spans(transcribed_patches: dict, llm_spans: list):
     return processed_spans
 
 
-def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session, extremism_definition: str = None):
+def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session, default_definitions: list = None, custom_definitions: list = None, negative_examples: list = None):
 
     job = db.get(Job, job_id)
     job.status = "transcribing"
@@ -115,7 +117,7 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     db.commit()
     db.expire_all()
 
-    result_from_llm = send_to_llm(transcribed_text, extremism_definition)
+    result_from_llm = send_to_llm(transcribed_text, default_definitions, custom_definitions, negative_examples)
 
     print(result_from_llm)
 
