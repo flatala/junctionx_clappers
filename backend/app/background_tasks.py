@@ -58,14 +58,19 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
 
     transcribed_patches = process_file(original_path, patch_duration_sec, overlap_sec)
 
+
+    transcribed_text = transcribed_patches[0]["patch_text"].strip()
+
+    # Save transcribed text to file
+    txt_path = Path(original_path).with_suffix('.txt')
+    with open(txt_path, 'w', encoding='utf-8') as f:
+        f.write(transcribed_text)
+
     # Update job in DB
     job = db.get(Job, job_id)
     job.status = "transcribed"
     db.commit()
 
-    transcribed_text = transcribed_patches[0]["patch_text"].strip()
-
-    print(transcribed_patches)
 
     processed_text = send_to_llm(transcribed_text)
 

@@ -20,24 +20,31 @@ async def transcribe(
     # Save the uploaded file permanently (original copy)
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    original_path = uploads_dir / file.filename
-    with open(original_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
 
-    job = Job(original_file_path=str(original_path), status="transcribing")
+    job = Job(status="transcribing")
     db.add(job)
     db.commit()
     db.refresh(job)
 
+    # Get file extension
+    file_ext = Path(file.filename).suffix if file.filename else ""
+    original_path = uploads_dir / f"{job.id}{file_ext}"
+    
+    with open(str(original_path), "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    job.original_file_path = str(original_path)
+
     # Launch background task
     background_tasks.add_task(
         main_background_function,
-        job.id,
+        str(job.id),
         str(original_path),
         patch_duration_sec,
         overlap_sec,
         db
     )
 
-    return job.id
+    return str(job.id)
+
 
