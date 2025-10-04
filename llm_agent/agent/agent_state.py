@@ -7,5 +7,6 @@ class AgentState(BaseModel):
 
     transcription: str = ""
     additional_criteria: List[str] = Field(default_factory=list)
+    refined_criteria: List[str] = Field(default_factory=list)
     messages: list = Field(default_factory=list)
     response: str = ""

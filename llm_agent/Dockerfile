@@ -12,6 +12,9 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 # Set working directory
 WORKDIR /app
 
+# Set default model (can be overridden at runtime)
+ENV OLLAMA_MODEL=qwen3:8b
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 

@@ -16,6 +16,14 @@ class AgentConfiguration:
         },
     )
 
+    criteria_refinement_prompt: str = field(
+        default=prompts.REFINE_CRITERIA,
+        metadata={
+            "description": "The prompt for refining additional criteria.",
+            "parameters": "Takes a string parameter: additional_criteria"
+        },
+    )
+
     human_prompt: str = field(
         default=prompts.HUMAN_PROMPT,
         metadata={
