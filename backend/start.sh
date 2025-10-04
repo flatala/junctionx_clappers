@@ -2,72 +2,47 @@
 
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 ENV_NAME="backend"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-echo -e "${BLUE}==== Backend Setup & Start ====${NC}"
+echo "==== Backend Setup & Start ===="
 echo ""
 
-# Check if mamba is installed
+# Check mamba
 if ! command -v mamba &> /dev/null; then
-    echo -e "${RED}Error: mamba is not installed${NC}"
-    echo "Please install mamba first: https://mamba.readthedocs.io/en/latest/installation.html"
+    echo "Error: mamba not installed"
     exit 1
 fi
 
-# Check if environment exists
-echo -e "${GREEN}[1/5] Checking mamba environment '${ENV_NAME}'...${NC}"
-if mamba env list | grep -q "^${ENV_NAME} "; then
-    echo "Environment '${ENV_NAME}' already exists"
+# Check/create env
+echo "[1/4] Checking mamba env '${ENV_NAME}'..."
+if mamba run -n ${ENV_NAME} python --version > /dev/null 2>&1; then
+    echo "Environment exists"
 else
-    echo "Creating environment '${ENV_NAME}' with Python 3.10..."
+    echo "Creating environment..."
     mamba create -n ${ENV_NAME} python=3.10 -y
 fi
 echo ""
 
-# Install dependencies
-echo -e "${GREEN}[2/5] Installing Python dependencies...${NC}"
+# Install deps
+echo "[2/4] Installing dependencies..."
 cd ${SCRIPT_DIR}
-mamba run -n ${ENV_NAME} pip install -r requirements.txt
-echo ""
-
-# Check Docker
-echo -e "${GREEN}[3/5] Checking Docker...${NC}"
-if ! docker info > /dev/null 2>&1; then
-    echo -e "${RED}Error: Docker is not running${NC}"
-    echo "Please start Docker Desktop first"
-    exit 1
-fi
-echo "Docker is running"
+mamba run -n ${ENV_NAME} pip install -q -r requirements.txt
 echo ""
 
 # Start MySQL
-echo -e "${GREEN}[4/5] Starting MySQL container...${NC}"
+echo "[3/4] Starting MySQL..."
 cd ${SCRIPT_DIR}/..
 docker-compose up -d mysql
-
-# Wait for MySQL to be ready
-echo "Waiting for MySQL to be ready..."
-until docker exec junctionx_mysql mysqladmin ping -h localhost --silent 2>/dev/null; do
-    printf '.'
-    sleep 1
-done
-echo ""
-echo "MySQL is ready!"
+sleep 5
 echo ""
 
-# Start backend
-echo -e "${GREEN}[5/5] Starting Backend API...${NC}"
+# Kill port and start backend
+echo "[4/4] Starting backend..."
 cd ${SCRIPT_DIR}
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 echo ""
-echo -e "${BLUE}Backend starting at http://localhost:8000${NC}"
-echo -e "${BLUE}API Docs: http://localhost:8000/docs${NC}"
+echo "Backend: http://localhost:8000"
+echo "Docs: http://localhost:8000/docs"
 echo ""
 mamba run -n ${ENV_NAME} uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

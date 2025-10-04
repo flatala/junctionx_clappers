@@ -2,57 +2,34 @@
 
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-echo -e "${BLUE}==== Frontend Setup & Start ====${NC}"
+echo "==== Frontend Setup & Start ===="
 echo ""
 
-# Check if Node.js is installed
-echo -e "${GREEN}[1/3] Checking Node.js installation...${NC}"
+# Check Node.js
+echo "[1/3] Checking Node.js..."
 if ! command -v node &> /dev/null; then
-    echo -e "${RED}Error: Node.js is not installed${NC}"
-    echo ""
-    echo "Please install Node.js:"
-    echo "  macOS: brew install node"
-    echo "  Or download from: https://nodejs.org"
+    echo "Error: Node.js not installed"
     exit 1
 fi
-
-NODE_VERSION=$(node --version)
-echo "Node.js ${NODE_VERSION} is installed"
+echo "Node $(node --version)"
 echo ""
 
-# Check if npm is installed
-if ! command -v npm &> /dev/null; then
-    echo -e "${RED}Error: npm is not installed${NC}"
-    exit 1
-fi
-
-NPM_VERSION=$(npm --version)
-echo "npm ${NPM_VERSION} is installed"
-echo ""
-
-# Install dependencies if needed
-echo -e "${GREEN}[2/3] Checking npm dependencies...${NC}"
+# Install deps
+echo "[2/3] Installing dependencies..."
 cd ${SCRIPT_DIR}
 if [ ! -d "node_modules" ]; then
-    echo "Installing npm dependencies..."
     npm install
 else
     echo "Dependencies already installed"
 fi
 echo ""
 
-# Start frontend
-echo -e "${GREEN}[3/3] Starting Frontend...${NC}"
+# Kill port and start
+echo "[3/3] Starting frontend..."
+lsof -ti:5173 | xargs kill -9 2>/dev/null || true
 echo ""
-echo -e "${BLUE}Frontend starting at http://localhost:5173${NC}"
+echo "Frontend: http://localhost:5173"
 echo ""
 npm run dev
