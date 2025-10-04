@@ -46,29 +46,61 @@ def transcribe_patches(patches, model):
     all_results = []
     for i, patch_path in enumerate(patches):
         print(f"[INFO] Transcribing patch {i}: {patch_path}")
-        result = model.transcribe(patch_path, word_timestamps=True, verbose=False, fp16=False)
-        lang = result.get('language', 'unknown')
-        words = []
-        word_id = 0
-        for segment in result.get('segments', []):
-            for word in segment.get('words', []):
-                words.append({
-                    'id': word_id,
-                    'word': word.get('word', '').strip(),
-                    'start': word.get('start', segment.get('start', None)),
-                    'end': word.get('end', segment.get('end', None)),
-                    'probability': word.get('probability', None),
-                    'phrase_text': segment.get('text', ''),
-                    'phrase_start': segment.get('start', None),
-                    'phrase_end': segment.get('end', None)
-                })
-                word_id += 1
-        patch_result = {
-            'language': lang,
-            'words': words,
-            'patch_index': i,
-            'patch_text': result.get('text', '')
+        
+        # faster-whisper returns (segments_generator, info)
+        segments, info = model.transcribe(
+            patch_path,
+            word_timestamps=True,
+            vad_filter=True,
+            beam_size=1
+        )
+        
+        # Convert generator to list to allow iteration
+        segments = list(segments)
+        
+        result = {
+            "text": "",
+            "segments": [],
+            "words": []
         }
-        print(f"[INFO] Patch {i} language: {lang}, words: {len(words)}")
+        
+        word_id = 0
+        for segment in segments:
+            result["text"] += segment.text
+            result["segments"].append({
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text
+            })
+            
+            # In faster-whisper, words are accessed directly as segment.words
+            if hasattr(segment, 'words') and segment.words:
+                for word in segment.words:
+                    result["words"].append({
+                        'id': word_id,
+                        'word': word.word.strip(),
+                        'start': word.start,
+                        'end': word.end,
+                        'probability': word.probability,
+                        'phrase_text': segment.text,
+                        'phrase_start': segment.start,
+                        'phrase_end': segment.end
+                    })
+                    word_id += 1
+        
+        patch_result = {
+            'language': info.language if hasattr(info, 'language') else 'unknown',
+            'words': result["words"],
+            'patch_index': i,
+            'patch_text': result["text"]
+        }
+        
+        print(f"[INFO] Patch {i} language: {patch_result['language']}, words: {len(result['words'])}")
+        
+        # Add safety check
+        if not result["words"]:
+            print(f"[WARNING] No words detected in patch {i}. Text: '{result['text'][:100]}'")
+        
         all_results.append(patch_result)
+    
     return all_results

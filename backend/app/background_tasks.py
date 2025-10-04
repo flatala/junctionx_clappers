@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from app.transcribe import convert_video_to_audio, split_audio_to_patches, transcribe_patches
 import os
-import whisper
+from faster_whisper import WhisperModel
 from app.models import Job
 import requests
 import string
@@ -14,7 +14,7 @@ import json
 # Load Whisper model only once
 MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
 print(f"[INFO] Loading Whisper model: {MODEL_SIZE}")
-whisper_model = whisper.load_model(MODEL_SIZE)
+whisper_model = WhisperModel(MODEL_SIZE, device="cuda", compute_type="float16")
 print("[INFO] Whisper model loaded.")
 
 
