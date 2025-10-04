@@ -56,6 +56,7 @@ class AnalysisSpan(BaseModel):
     end: str
     text: str
     rationale: str
+    confidence: float
 
 
 class JobAnalysisResult(BaseModel):

@@ -150,7 +150,8 @@ async def get_job_analysis(batch_id: str, job_id: str, db: Session = Depends(get
                 start=start,
                 end=end,
                 text=span.get("text", ""),
-                rationale=span.get("rationale", "")
+                rationale=span.get("rationale", ""),
+                confidence=span.get("confidence", 0.0)
             ))
 
     return JobAnalysisResult(

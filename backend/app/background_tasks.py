@@ -112,7 +112,8 @@ def find_matching_spans(transcribed_patches: dict, llm_spans: list):
                     "start": transcribed_patches["words"][start_ind]["start"],
                     "end": transcribed_patches["words"][end_ind]["end"],
                     "text": span_text,
-                    "rationale": llm_span["rationale"]
+                    "rationale": llm_span["rationale"],
+                    "confidence": llm_span.get("confidence", 0.0)
                 })
 
     return processed_spans
