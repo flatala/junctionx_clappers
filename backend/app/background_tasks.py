@@ -6,6 +6,7 @@ from app.transcribe import convert_video_to_audio, split_audio_to_patches, trans
 import os
 import whisper
 from app.models import Job
+import requests
 
 
 # Load Whisper model only once
@@ -38,6 +39,21 @@ def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
         return all_results
 
 
+def send_to_llm(transcribed_text: str):
+    print("SENDING TO LLM")
+    response = requests.post(
+        "http://localhost:8001/detect",
+        json={
+            "transcription": transcribed_text,
+            "additional_criteria": []
+        }
+    )
+
+    result = response.json()
+
+    return result
+
+
 def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session):
 
     transcribed_patches = process_file(original_path, patch_duration_sec, overlap_sec)
@@ -47,6 +63,12 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     job.status = "transcribed"
     db.commit()
 
+    transcribed_text = transcribed_patches[0]["patch_text"].strip()
+
     print(transcribed_patches)
+
+    processed_text = send_to_llm(transcribed_text)
+
+    print(processed_text)
 
     db.close()
