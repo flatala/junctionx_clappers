@@ -1,31 +1,58 @@
 # junctionx_clappers
 
-A full-stack application with FastAPI backend and React frontend.
+A full-stack application with FastAPI backend, React frontend, and LLM-powered extremist content detection.
+
+## Quick Start
+
+### Local Development (Recommended)
+
+**Start all services:**
+```bash
+./start.sh
+```
+
+**Stop all services:**
+```bash
+./stop.sh
+```
+
+Services will be available at:
+- **Frontend**: http://localhost:5173
+- **Backend**: http://localhost:8000
+- **LLM Agent**: http://localhost:8001
+
+### Docker
+
+**Start all services with Docker:**
+```bash
+docker-compose up --build
+```
+
+**Stop all services:**
+```bash
+docker-compose down
+```
 
 ## Project Structure
 
 ```
 junctionx_clappers/
 ├── backend/               # FastAPI backend application
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py       # FastAPI application and endpoints
-│   │   ├── database.py   # Database configuration
-│   │   ├── models.py     # SQLAlchemy models
-│   │   ├── schemas.py    # Pydantic schemas
-│   │   └── test_user.py  # User endpoints
-│   ├── .env.example      # Example environment variables
-│   ├── docker-compose.yml # Docker Compose configuration
-│   └── requirements.txt  # Python dependencies
-├── frontend/             # React + Vite frontend application
-│   ├── src/
-│   │   ├── components/   # React components
-│   │   ├── lib/          # Utility functions
-│   │   ├── App.tsx       # Main App component
-│   │   └── main.tsx      # Entry point
-│   ├── package.json      # Node.js dependencies
-│   └── vite.config.ts    # Vite configuration
-└── README.md
+│   ├── app/              # Application code
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/             # React + Vite frontend
+│   ├── src/              # React components and logic
+│   ├── Dockerfile
+│   └── package.json
+├── llm_agent/            # LLM-based content detection service
+│   ├── agent/            # Detection agent logic
+│   ├── Dockerfile
+│   ├── entrypoint.sh     # Ollama setup script
+│   └── requirements.txt
+├── docker-compose.yml    # Main Docker orchestration
+├── start.sh              # Start all services locally
+└── stop.sh               # Stop all services
 ```
 
 ## Features
@@ -33,114 +60,101 @@ junctionx_clappers/
 ### Backend
 - FastAPI web framework
 - MySQL database with SQLAlchemy ORM
-- CRUD operations for User model
-- Docker Compose for easy database setup
-- Environment-based configuration
+- Audio file upload and processing
+- Integration with LLM agent for content detection
 
 ### Frontend
 - React 18 with TypeScript
 - Vite for fast development and building
 - Tailwind CSS for styling
 - shadcn/ui component library
-- Modern, responsive UI
+- Audio upload and transcription interface
+
+### LLM Agent
+- Qwen 3 8B language model via Ollama
+- Extremist content detection
+- LangGraph-based agent architecture
+- FastAPI service with health checks
 
 ## Prerequisites
 
-- Python 3.8+
-- Node.js 18+
-- Docker and Docker Compose (optional, for MySQL container)
+### For Local Development (start.sh)
+- **mamba** (conda alternative)
+- **Ollama** (https://ollama.com)
+- **Node.js** 18+
+- **Docker** (for MySQL)
 
-## Setup
+### For Docker (docker-compose)
+- **Docker** and **Docker Compose**
 
-### Backend Setup
+## Manual Setup (Optional)
 
-1. Navigate to the backend directory:
+If you prefer to run services individually instead of using `./start.sh`:
+
+### Backend
 ```bash
 cd backend
+mamba create -n backend python=3.10 -y
+mamba run -n backend pip install -r requirements.txt
+docker-compose up -d mysql  # Start MySQL only
+mamba run -n backend uvicorn app.main:app --reload --port 8000
 ```
 
-2. Create a virtual environment and activate it:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your database credentials
-```
-
-5. Start the MySQL container:
-```bash
-docker-compose up -d
-```
-
-6. Run the backend server:
-```bash
-uvicorn app.main:app --reload
-```
-
-The API will be available at `http://localhost:8000`
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
+### Frontend
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Run the development server:
-```bash
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:5173`
+### LLM Agent
+```bash
+cd llm_agent
+mamba create -n llm_agent python=3.11 -y
+mamba run -n llm_agent pip install -r requirements.txt
+ollama serve &  # Start Ollama
+ollama pull qwen3:8b  # Pull model
+mamba run -n llm_agent uvicorn api:app --port 8001
+```
 
 ## API Documentation
 
-Once the backend server is running, visit:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+Once services are running, visit:
+- **Backend**: http://localhost:8000/docs
+- **LLM Agent**: http://localhost:8001/docs
 
 ## API Endpoints
 
-### Health Check
+### Backend (Port 8000)
 - `GET /` - Root endpoint
 - `GET /health` - Health check
+- `POST /upload-audio` - Upload audio file for transcription
 
-### Users
-- `POST /users` - Create a new user
-- `GET /users` - Get all users (with pagination)
-- `GET /users/{user_id}` - Get a specific user
-- `PUT /users/{user_id}` - Update a user
-- `DELETE /users/{user_id}` - Delete a user
+### LLM Agent (Port 8001)
+- `GET /` - Service information
+- `GET /health` - Health check
+- `POST /detect` - Detect extremist content in text
 
-## Development
+## Tech Stack
 
-### Backend Stack
+### Backend
 - **FastAPI**: Modern, fast web framework for building APIs
 - **SQLAlchemy**: SQL toolkit and ORM
-- **Pydantic**: Data validation using Python type annotations
-- **PyMySQL**: Pure Python MySQL driver
-- **Uvicorn**: ASGI server implementation
+- **MySQL**: Database
+- **Uvicorn**: ASGI server
 
-### Frontend Stack
+### Frontend
 - **React**: UI library
 - **TypeScript**: Type-safe JavaScript
 - **Vite**: Build tool and dev server
 - **Tailwind CSS**: Utility-first CSS framework
 - **shadcn/ui**: Re-usable component library
+
+### LLM Agent
+- **Ollama**: Local LLM inference
+- **Qwen 3 8B**: Language model
+- **LangGraph**: Agent orchestration framework
+- **FastAPI**: Service API
 
 ## License
 
