@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(9.69% 0.041 285.86);
+  
+  --color-primary: oklch(24.42% 0.061 285.86);
+  --color-primary-foreground: oklch(98% 0 0);
+  
+  --color-secondary: oklch(96.1% 0 0);
+  --color-secondary-foreground: oklch(24.42% 0.061 285.86);
+  
+  --color-accent: oklch(96.1% 0 0);
+  --color-accent-foreground: oklch(24.42% 0.061 285.86);
+  
+  --color-muted: oklch(96.1% 0 0);
+  --color-muted-foreground: oklch(46.9% 0 0);
+  
+  --color-destructive: oklch(60.2% 0.204 27.33);
+  --color-destructive-foreground: oklch(98% 0 0);
+  
+  --color-border: oklch(91.4% 0 0);
+  --color-input: oklch(91.4% 0 0);
+  --color-ring: oklch(9.69% 0.041 285.86);
+  
+  --radius: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: oklch(9.69% 0.041 285.86);
+    --color-foreground: oklch(98% 0 0);
+    
+    --color-primary: oklch(98% 0 0);
+    --color-primary-foreground: oklch(24.42% 0.061 285.86);
+    
+    --color-secondary: oklch(17.5% 0.021 285.86);
+    --color-secondary-foreground: oklch(98% 0 0);
+    
+    --color-accent: oklch(17.5% 0.021 285.86);
+    --color-accent-foreground: oklch(98% 0 0);
+    
+    --color-muted: oklch(17.5% 0.021 285.86);
+    --color-muted-foreground: oklch(65.1% 0 0);
+    
+    --color-destructive: oklch(30.6% 0.183 27.33);
+    --color-destructive-foreground: oklch(98% 0 0);
+    
+    --color-border: oklch(17.5% 0.021 285.86);
+    --color-input: oklch(17.5% 0.021 285.86);
+    --color-ring: oklch(83.9% 0.03 285.86);
+  }
+}
