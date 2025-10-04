@@ -7,3 +7,5 @@ python-dotenv==1.0.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 email-validator==2.2.0
+openai-whisper
+python-multipart

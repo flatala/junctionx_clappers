@@ -1,10 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from app.database import engine, get_db, Base
-from app.models import User
-from app.schemas import UserCreate, UserResponse
+from fastapi import FastAPI, UploadFile, File
+from app.database import engine, Base
 from app.test_user import router as user_router
+from app.whisper_processing import process_audio_file
+
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -14,7 +12,7 @@ app = FastAPI(
     description="Minimal FastAPI template with MySQL database",
     version="1.0.0"
 )
-app.include_router(router=user_router, prefix="/users")
+app.include_router(router=user_router, prefix="/users", tags=["users"])
 
 
 @app.get("/")
@@ -35,3 +33,8 @@ def health_check():
     }
 
 
+@app.post("/upload-audio")
+async def process_audio(file: UploadFile = File(...)):
+    result = await process_audio_file(file)
+
+    return result
