@@ -44,12 +44,8 @@ export default function FileDropZone({ onFileSelect, accept = ".mp3,.wav,.mp4,au
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
       <p className="text-lg font-medium">
         Drop your file here or click to browse
-      </p>
-      <p className="text-sm text-muted-foreground mt-2">
-        Supports MP3, WAV, MP4 files up to 100MB
       </p>
       <Input
         type="file"

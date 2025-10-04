@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { TranscriptSegment } from '../components/transcript-view';
+import { api, ApiError } from '../lib/api';
+import { analyzeTextContent } from '../lib/content-analysis';
 
 const progressStages = [
   'Initializing analysis...',
@@ -11,6 +13,17 @@ const progressStages = [
   'Analysis complete!'
 ];
 
+// Helper function to format timestamps
+function formatTimestamp(start: number, end: number): string {
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  return `[${formatTime(start)}–${formatTime(end)}]`;
+}
+
 export function useAnalysis() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -18,11 +31,26 @@ export function useAnalysis() {
   const [currentStage, setCurrentStage] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setShowResults(false);
     setProgress(0);
+    setError(null); // Clear any previous errors
+  };
+
+  const clearError = () => {
+    setError(null);
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setShowResults(false);
+    setProgress(0);
+    setCurrentStage('');
+    setError(null);
+    setTranscriptSegments([]);
   };
 
   const handleStartAnalysis = async () => {
@@ -31,75 +59,67 @@ export function useAnalysis() {
     setIsAnalyzing(true);
     setProgress(0);
     setShowResults(false);
+    setError(null);
 
-    // Simulate analysis progress
-    for (let i = 0; i < progressStages.length; i++) {
-      setCurrentStage(progressStages[i]);
+    try {
+      // Stage 1: Initialize
+      setCurrentStage(progressStages[0]);
+      setProgress(10);
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Stage 2: Upload and process audio
+      setCurrentStage(progressStages[1]);
+      setProgress(30);
       
-      const stageProgress = Math.floor((i / (progressStages.length - 1)) * 100);
+      const whisperResult = await api.uploadAudio(selectedFile);
       
-      for (let j = 0; j <= 15; j++) {
-        const currentProgress = Math.min(stageProgress + j * (15 / 15), 100);
-        setProgress(currentProgress);
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
+      // Stage 3: Generate transcript
+      setCurrentStage(progressStages[2]);
+      setProgress(60);
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Mock data for demonstration
-    const mockTranscriptSegments: TranscriptSegment[] = [
-      {
-        id: '1',
-        timestamp: '[00:00–00:12]',
-        text: 'Hello everyone, welcome to today\'s presentation about our community outreach program.',
-        confidence: 0.95,
-        flag: 'neutral',
-      },
-      {
-        id: '2',
-        timestamp: '[00:14–00:22]',
-        text: 'We need to address some damn issues in our neighborhood that have been ongoing.',
-        confidence: 0.87,
-        flag: 'mild',
-        explanation: 'Contains mild profanity but not directed at individuals or groups.',
-      },
-      {
-        id: '3',
-        timestamp: '[00:25–00:38]',
-        text: 'The community center has been serving families for over 20 years and continues to be a safe space.',
-        confidence: 0.92,
-        flag: 'neutral',
-      },
-      {
-        id: '4',
-        timestamp: '[01:12–01:28]',
-        text: 'Those people from that community are always causing problems and shouldn\'t be allowed here.',
-        confidence: 0.91,
-        flag: 'extremist',
-        explanation: 'Contains discriminatory language targeting a specific group. Promotes exclusion based on identity.',
-      },
-      {
-        id: '5',
-        timestamp: '[01:45–01:52]',
-        text: 'We should work together to find solutions that benefit everyone in our diverse community.',
-        confidence: 0.89,
-        flag: 'neutral',
-      },
-      {
-        id: '6',
-        timestamp: '[02:15–02:23]',
-        text: 'This shit needs to stop, but we can handle it professionally.',
-        confidence: 0.83,
-        flag: 'mild',
-        explanation: 'Contains strong language but used for emphasis rather than targeting individuals.',
-      },
-    ];
+      // Stage 4: Analyze content
+      setCurrentStage(progressStages[3]);
+      setProgress(80);
+      
+      const segments: TranscriptSegment[] = whisperResult.segments.map((segment, index) => {
+        const analysis = analyzeTextContent(segment.text);
+        return {
+          id: String(segment.id || index + 1),
+          timestamp: formatTimestamp(segment.start, segment.end),
+          text: segment.text.trim(),
+          confidence: analysis.confidence,
+          flag: analysis.flag,
+          explanation: analysis.explanation,
+        };
+      });
 
-    // Show results
-    setTimeout(() => {
+      // Stage 5: Identify problematic segments
+      setCurrentStage(progressStages[4]);
+      setProgress(90);
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Stage 6: Compile report
+      setCurrentStage(progressStages[5]);
+      setProgress(95);
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Stage 7: Complete
+      setCurrentStage(progressStages[6]);
+      setProgress(100);
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Show results
       setIsAnalyzing(false);
       setShowResults(true);
-      setTranscriptSegments(mockTranscriptSegments);
-    }, 500);
+      setTranscriptSegments(segments);
+
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setError(err instanceof ApiError ? err.message : 'Analysis failed. Please try again.');
+      setIsAnalyzing(false);
+      setCurrentStage('Analysis failed');
+    }
   };
 
   return {
@@ -109,7 +129,10 @@ export function useAnalysis() {
     currentStage,
     showResults,
     transcriptSegments,
+    error,
     handleFileSelect,
     handleStartAnalysis,
+    handleRemoveFile,
+    clearError,
   };
 }
