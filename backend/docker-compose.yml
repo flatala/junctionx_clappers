@@ -15,5 +15,18 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
 
+  backend:
+    build: .
+    container_name: backend_app
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app   # mount code for live reload (optional)
+    depends_on:
+      - mysql
+    env_file:
+      - .env
+
 volumes:
   mysql_data:

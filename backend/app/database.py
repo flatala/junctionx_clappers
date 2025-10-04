@@ -7,7 +7,7 @@ import os
 # Load environment variables
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://user:password@localhost:3306/junctionx_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://user:password@mysql:3306/junctionx_db")
 
 engine = create_engine(DATABASE_URL, echo=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

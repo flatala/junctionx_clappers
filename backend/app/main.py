@@ -1,10 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from app.database import engine, get_db, Base
-from app.models import User
-from app.schemas import UserCreate, UserResponse
+from fastapi import FastAPI, UploadFile, File
+from app.database import engine, Base
 from app.test_user import router as user_router
+import whisper
+import tempfile
+
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -14,7 +13,11 @@ app = FastAPI(
     description="Minimal FastAPI template with MySQL database",
     version="1.0.0"
 )
-app.include_router(router=user_router, prefix="/users")
+app.include_router(router=user_router, prefix="/users", tags=["users"])
+
+
+# Load model once on startup
+whisper_model = whisper.load_model("small")
 
 
 @app.get("/")
@@ -35,3 +38,16 @@ def health_check():
     }
 
 
+@app.post("/transcribe")
+async def transcribe(file: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    result = whisper_model.transcribe(tmp_path)
+
+    return {
+        "text": result["text"],
+        "segments": result["segments"],  # includes start/end timestamps
+        "language": result["language"],
+    }
