@@ -3,7 +3,7 @@
 set -e
 
 ENV_NAME="llm_agent"
-MODEL_NAME="qwen2.5:3b"
+MODEL_NAME="qwen3:8b"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "==== LLM Agent Setup & Start ===="
@@ -37,6 +37,15 @@ if ! command -v ollama &> /dev/null; then
     echo "Error: Ollama not installed"
     echo "Install from: https://ollama.com"
     exit 1
+fi
+
+# Start Ollama if not running
+if ! pgrep -x ollama > /dev/null; then
+    echo "Starting Ollama service..."
+    ollama serve > /dev/null 2>&1 &
+    sleep 3
+else
+    echo "Ollama already running"
 fi
 
 # Pull model if needed
