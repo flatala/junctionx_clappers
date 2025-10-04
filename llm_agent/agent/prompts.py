@@ -27,9 +27,7 @@ Provide your response as a JSON object with the following structure:
     "spans": [
         {{
             "text": "the exact text span identified as extremist",
-            "rationale": "detailed explanation of why this span is considered extremist",
-            "start_index": <word index of first word in span>,
-            "end_index": <word index of last word in span>
+            "rationale": "detailed explanation of why this span is considered extremist"
         }}
     ]
 }}

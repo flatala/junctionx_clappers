@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, START, END
-from agent_state import AgentState
-from nodes import qwen_node
+from .agent_state import AgentState
+from .nodes import qwen_node
 
 # Create the workflow graph
 workflow = StateGraph(AgentState)

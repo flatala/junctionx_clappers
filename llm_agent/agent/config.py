@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field, fields
 from typing import Optional
 from langchain_core.runnables import RunnableConfig, ensure_config
-import prompts
+from . import prompts
 
 
 @dataclass(kw_only=True)

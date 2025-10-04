@@ -1,9 +1,9 @@
 from langchain_core.messages import SystemMessage, HumanMessage
-from agent_state import AgentState
+from .agent_state import AgentState
 from typing import Optional
-from config import AgentConfiguration as Configuration
+from .config import AgentConfiguration as Configuration
 from langchain_core.runnables import RunnableConfig
-from utils import get_llm
+from .utils import get_llm
 
 
 def qwen_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
