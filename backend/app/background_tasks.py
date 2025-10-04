@@ -92,7 +92,7 @@ def find_matching_spans(transcribed_patches: dict, llm_spans: list):
     return processed_spans
 
 
-def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session):
+def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session, extremism_definition: str = None):
 
     job = db.get(Job, job_id)
     job.status = "transcribing"
@@ -115,7 +115,7 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     db.commit()
     db.expire_all()
 
-    result_from_llm = send_to_llm(transcribed_text)
+    result_from_llm = send_to_llm(transcribed_text, extremism_definition)
 
     print(result_from_llm)
 
@@ -128,12 +128,11 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     txt_path = Path(original_path).with_suffix('.json')
     with open(txt_path, 'w', encoding='utf-8') as f:
         json.dump(final_result, f, indent=4)
-        # f.write(final_result)
 
     print(processed_spans)
 
     job = db.get(Job, job_id)
-    job.status = "done"
+    job.status = "completed"
     db.commit()
 
     db.close()

@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from pathlib import Path
-from typing import List
-import os
-
 from app.database import get_db
 from app.models import Batch, Job
 from app.schemas import BatchResponse, JobAnalysisResult, AnalysisSpan, JobInfo
+import os
+import mimetypes
+import json
+from pathlib import Path
 
 router = APIRouter()
 
@@ -18,15 +18,12 @@ async def retrieve_file(job_id: str):
     Retrieve a file based on job ID.
     """
     
-    # Construct the file path
-    file_path = os.path.join("uploads", f"{job_id}")
-    
     # Find file with any extension
     if not os.path.exists("uploads"):
         raise HTTPException(status_code=404, detail="Uploads directory not found")
     
     # Search for files matching the job_id
-    matching_files = [f for f in os.listdir("uploads") if f.startswith(f"{job_id}.")]
+    matching_files = [f for f in os.listdir("uploads") if f.startswith(f"{job_id}.") and (not f.endswith(".txt")) and (not f.endswith(".json"))]
     
     if not matching_files:
         raise HTTPException(status_code=404, detail="File not found")
@@ -34,19 +31,13 @@ async def retrieve_file(job_id: str):
     # Use the first matching file
     filename = matching_files[0]
     file_path = os.path.join("uploads", filename)
-    
-    # Determine media type based on extension
-    extension = filename.split('.')[-1].lower()
-    media_types = {
-        'mp4': 'video/mp4',
-        'avi': 'video/x-msvideo',
-        'mov': 'video/quicktime',
-        'mkv': 'video/x-matroska',
-        'flv': 'video/x-flv',
-        'wmv': 'video/x-ms-wmv',
-        'webm': 'video/webm',
-    }
-    media_type = media_types.get(extension, 'application/octet-stream')
+
+    # Guess the content type based on the file extension
+    media_type, _ = mimetypes.guess_type(file_path)
+
+    # Fallback if mimetypes can't guess it
+    if media_type is None:
+        media_type = "application/octet-stream"
     
     # Return the file
     return FileResponse(
@@ -56,26 +47,43 @@ async def retrieve_file(job_id: str):
     )
 
 
-@router.get("/transcription/{job_id}")
-async def retrieve_transcription(job_id: str):
+@router.get("/{job_id}")
+async def retrieve_status_and_processed(job_id: str, db: Session = Depends(get_db)):
     """
     Retrieve a transcription file based on job ID.
     """
-    
-    # Construct the file path for transcription
-    transcription_filename = f"{job_id}.txt"
-    file_path = os.path.join("uploads", transcription_filename)
-    
-    # Check if transcription file exists
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Transcription not found")
-    
-    # Return the file
-    return FileResponse(
-        path=file_path,
-        media_type='text/plain',
-        filename=transcription_filename
-    )
+
+    job = db.get(Job, job_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    to_return = {"status": job.status}
+
+    if job.status == "transcribing":
+        return to_return
+
+    if not job.original_file_path:
+        return to_return
+
+    transcription_path = Path(job.original_file_path).with_suffix('.txt')
+    if transcription_path.exists():
+        with open(transcription_path, "r") as f:
+            to_return["transcript_text"] = f.read()
+    else:
+        to_return["transcript_text"] = ""
+
+    if job.status == "analysing":
+        return to_return
+
+    json_path = Path(job.original_file_path).with_suffix('.json')
+    if json_path.exists():
+        with open(json_path, "r") as f:
+            to_return["spans"] = json.load(f)
+    else:
+        to_return["spans"] = []
+
+    return to_return
 
 
 @router.get("/batch/{batch_id}", response_model=BatchResponse)
@@ -84,7 +92,7 @@ async def get_batch(batch_id: str, db: Session = Depends(get_db)):
     batch = db.query(Batch).filter(Batch.id == batch_id).first()
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
-    
+
     jobs = []
     for job in batch.jobs:
         jobs.append(JobInfo(
@@ -92,34 +100,12 @@ async def get_batch(batch_id: str, db: Session = Depends(get_db)):
             filename=job.original_filename or f"job_{job.id}",
             status=job.status
         ))
-    
+
     return BatchResponse(
         name=batch.name,
         description=batch.description,
         jobs=jobs
     )
-
-
-@router.get("/batch/{batch_id}/status")
-async def get_batch_status(batch_id: str, db: Session = Depends(get_db)):
-    """Get status of all jobs in a batch"""
-    batch = db.query(Batch).filter(Batch.id == batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=404, detail="Batch not found")
-    
-    jobs_status = []
-    for job in batch.jobs:
-        jobs_status.append({
-            "job_id": job.id,
-            "name": job.original_filename or job.id,
-            "status": job.status
-        })
-    
-    return {
-        "batch_id": batch.id,
-        "batch_status": batch.status,
-        "jobs": jobs_status
-    }
 
 
 @router.get("/batch/{batch_id}/{job_id}", response_model=JobAnalysisResult)
@@ -128,20 +114,24 @@ async def get_job_analysis(batch_id: str, job_id: str, db: Session = Depends(get
     job = db.query(Job).filter(Job.id == job_id, Job.batch_id == batch_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     if job.status != "completed":
         raise HTTPException(status_code=400, detail=f"Job not completed yet. Current status: {job.status}")
-    
-    # Parse analysis result
-    analysis_data = job.get_analysis_result_dict()
-    if not analysis_data:
-        # Fallback: return basic structure if no analysis data
-        return JobAnalysisResult(
-            audio_file_id=job.original_filename or job.id,
-            transcript_text=job.transcript_text or "",
-            spans=[]
-        )
-    
+
+    # Read analysis results from JSON file
+    if not job.original_file_path:
+        raise HTTPException(status_code=404, detail="Original file path not found")
+
+    json_path = Path(job.original_file_path).with_suffix('.json')
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Analysis results file not found")
+
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            analysis_data = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read analysis results: {str(e)}")
+
     # Convert analysis data to response format
     spans = []
     if "spans" in analysis_data:
@@ -152,10 +142,10 @@ async def get_job_analysis(batch_id: str, job_id: str, db: Session = Depends(get
                 text=span.get("text", ""),
                 rationale=span.get("rationale", "")
             ))
-    
+
     return JobAnalysisResult(
         audio_file_id=job.original_filename or job.id,
-        transcript_text=job.transcript_text or "",
+        transcript_text=analysis_data.get("transcript_text", ""),
         spans=spans
     )
 
@@ -166,31 +156,18 @@ async def get_job_file(batch_id: str, job_id: str, db: Session = Depends(get_db)
     job = db.query(Job).filter(Job.id == job_id, Job.batch_id == batch_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     if not job.original_file_path or not os.path.exists(job.original_file_path):
         raise HTTPException(status_code=404, detail="Original file not found")
-    
-    file_path = Path(job.original_file_path)
-    
+
     # Determine media type based on extension
-    extension = file_path.suffix.lower()
-    media_types = {
-        '.mp3': 'audio/mpeg',
-        '.wav': 'audio/wav',
-        '.m4a': 'audio/mp4',
-        '.mp4': 'video/mp4',
-        '.avi': 'video/x-msvideo',
-        '.mov': 'video/quicktime',
-        '.mkv': 'video/x-matroska',
-        '.flv': 'video/x-flv',
-        '.wmv': 'video/x-ms-wmv',
-        '.webm': 'video/webm',
-    }
-    media_type = media_types.get(extension, 'application/octet-stream')
-    
+    media_type, _ = mimetypes.guess_type(job.original_file_path)
+    if media_type is None:
+        media_type = "application/octet-stream"
+
     return FileResponse(
-        path=str(file_path),
+        path=job.original_file_path,
         media_type=media_type,
-        filename=job.original_filename or file_path.name
+        filename=job.original_filename or Path(job.original_file_path).name
     )
 
