@@ -32,14 +32,6 @@ class AgentConfiguration:
         },
     )
 
-    segmentation_prompt: str = field(
-        default=prompts.SEGMENT_PROMPT,
-        metadata={
-            "description": "The prompt for segmenting long transcriptions.",
-            "parameters": "Takes a string parameter: transcription"
-        },
-    )
-
     # PARAMETERS
     max_segment_length: int = field(
         default=500,

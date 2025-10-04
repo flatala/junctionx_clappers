@@ -12,29 +12,6 @@ GENERAL GUIDELINES
 - Adhere STRICTLY to the user's extremism definitions - do not add your own interpretations
 """
 
-SEGMENT_PROMPT = """Split the following transcript into logical chunks for analysis.
-
-TRANSCRIPT:
-{transcription}
-
-TASK:
-- Divide into coherent segments (by topic, speaker change, or natural breaks)
-- Each segment should be self-contained and meaningful
-- Preserve exact text, no summarization
-
-OUTPUT (JSON ONLY):
-{{
-  "segments": [
-    "segment 1 text...",
-    "segment 2 text..."
-  ]
-}}
-
-CONSTRAINTS:
-- Return ONLY valid JSON
-- Preserve all original text
-"""
-
 REFINE_CRITERIA = """You are refining user-supplied extremist classification criteria.
 
 INPUT:
