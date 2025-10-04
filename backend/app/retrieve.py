@@ -4,6 +4,7 @@ import os
 
 router = APIRouter()
 
+
 @router.get("/file/{job_id}")
 async def retrieve_file(job_id: str):
     """
@@ -46,6 +47,7 @@ async def retrieve_file(job_id: str):
         media_type=media_type,
         filename=filename
     )
+
 
 @router.get("/transcription/{job_id}")
 async def retrieve_transcription(job_id: str):
