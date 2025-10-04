@@ -137,6 +137,7 @@ export interface AnalysisSpan {
   end: string;
   text: string;
   rationale: string;
+  confidence: number;
 }
 
 export interface JobStatus {

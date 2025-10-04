@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { api, type JobAnalysisResult } from '@/lib/api';
 import TranscriptView, { type TranscriptSegment } from './transcript-view';
-import AnalysisOverview from './analysis-overview';
 import SummaryPanel from './summary-panel';
 import ErrorAlert from './error-alert';
 import { useExport } from '@/hooks/use-export';
 import type { FlagType } from './flag-icon';
+import InteractiveTranscript from './interactive-transcript';
+import type { ConfidenceMediaPlayerRef } from './confidence-media-player';
 
 // Helper function to parse time string to seconds
 const parseTimeToSeconds = (timeStr: string): number => {
@@ -61,6 +62,7 @@ export default function JobAnalysisView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const audioPlayerRef = useRef<ConfidenceMediaPlayerRef>(null);
 
   // Convert analysis result to transcript segments
   const transcriptSegments = analysisResult ? convertToTranscriptSegments(analysisResult) : [];
@@ -110,6 +112,21 @@ export default function JobAnalysisView() {
   };
 
   const clearError = () => setError(null);
+
+  const handleSpanClick = (spanStart: string) => {
+    // Parse time string to seconds
+    const parts = spanStart.split(':');
+    const seconds = parseFloat(parts[parts.length - 1]);
+    const minutes = parts.length > 1 ? parseInt(parts[parts.length - 2]) : 0;
+    const hours = parts.length > 2 ? parseInt(parts[parts.length - 3]) : 0;
+    const timeInSeconds = hours * 3600 + minutes * 60 + seconds;
+
+    // Seek to the timestamp and play
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.seekTo(timeInSeconds);
+      audioPlayerRef.current.play();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -186,24 +203,22 @@ export default function JobAnalysisView() {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <AnalysisOverview 
-            segments={transcriptSegments} 
-            summaryData={summaryData}
-          />
           
           {/* Full Transcript */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Full Transcript</CardTitle>
               <CardDescription>
-                Complete transcript with highlighted problematic segments
+                Click on highlighted text to jump to that moment in the audio
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="prose max-w-none">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                  {analysisResult.transcript_text}
-                </p>
+                <InteractiveTranscript
+                  transcriptText={analysisResult.transcript_text}
+                  spans={analysisResult.spans}
+                  onSpanClick={handleSpanClick}
+                />
               </div>
             </CardContent>
           </Card>
@@ -212,6 +227,8 @@ export default function JobAnalysisView() {
             segments={transcriptSegments}
             isVisible={true}
             audioFile={audioFile || undefined}
+            spans={analysisResult?.spans}
+            ref={audioPlayerRef}
           />
         </div>
       </div>
