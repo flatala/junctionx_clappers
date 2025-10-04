@@ -91,7 +91,7 @@ def find_matching_spans(transcribed_patches: dict, llm_spans: list):
     return processed_spans
 
 
-def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session):
+def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session, extremism_definition: str):
 
     job = db.get(Job, job_id)
     job.status = "transcribing"
