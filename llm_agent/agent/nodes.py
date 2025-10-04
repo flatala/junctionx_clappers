@@ -6,106 +6,84 @@ from langchain_core.runnables import RunnableConfig
 from .utils import get_llm
 import json
 import logging
-import traceback
 
 logger = logging.getLogger(__name__)
 
-async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
-    """
-    Node that refines user-provided additional criteria using LLM.
 
-    Args:
-        state: Current agent state with additional_criteria
-        config: Optional runnable config
-
-    Returns:
-        Updated state with refined_criteria
-    """
+async def segment_transcription(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
+    """Segment long transcriptions into logical chunks."""
     cfg = Configuration.from_runnable_config(config)
+    trans_len = len(state.transcription)
 
-    if state.additional_criteria:
-        criteria_text = "\n".join(f"- {criterion}" for criterion in state.additional_criteria)
-        logger.info(f"Additional criteria specified ({len(state.additional_criteria)} items)")
-        logger.debug(f"Criteria: {criteria_text}")
-
-        criteria_prompt = cfg.criteria_refinement_prompt.format(
-            additional_criteria=criteria_text
-        )
-
-        messages = [
-            HumanMessage(content=criteria_prompt)
-        ]
-
-        logger.info("Invoking LLM to refine criteria...")
-        try:
-            llm = get_llm()
-            response = await llm.ainvoke(messages)
-            logger.debug(f"LLM response for criteria refinement: {response.content[:500]}")
-            parsed_response = json.loads(response.content)
-            refined = parsed_response.get("criteria", [])
-            logger.info(f"Successfully refined {len(state.additional_criteria)} criteria into {len(refined)} criteria")
-            logger.debug(f"Refined criteria: {refined}")
-            return {"refined_criteria": refined}
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse criteria refinement JSON: {e}")
-            logger.warning("Falling back to original criteria")
-            return {"refined_criteria": state.additional_criteria}
-
-    else:
-        logger.info("No additional criteria provided, skipping refinement")
-        return {"refined_criteria": []}
-
-
-
-
-async def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
-    """
-    Node that calls LLM to detect extremist content.
-
-    Args:
-        state: Current agent state with transcription and refined criteria
-        config: Optional runnable config
-
-    Returns:
-        Updated state with response
-    """
-    cfg = Configuration.from_runnable_config(config)
-
-    # Format refined criteria (use refined if available, fallback to additional)
-    criteria = state.refined_criteria if state.refined_criteria else state.additional_criteria
-    if criteria:
-        criteria_text = "\n".join(f"- {criterion}" for criterion in criteria)
-        logger.info(f"Using {len(criteria)} criteria for content check")
-        logger.debug(f"Criteria: {criteria_text}")
-    else:
-        criteria_text = "None"
-        logger.info("No criteria specified for content check")
-
-    human_prompt_formatted = cfg.human_prompt.format(
-        transcription=state.transcription,
-        additional_criteria=criteria_text
-    )
-
-    # Build messages from config prompts
-    messages = [
-        SystemMessage(content=cfg.system_prompt),
-        HumanMessage(content=human_prompt_formatted)
-    ]
-
-    logger.info("Invoking LLM for content check...")
-    logger.debug(f"Transcription length: {len(state.transcription)} characters")
+    if trans_len <= cfg.max_segment_length:
+        logger.info(f"→ SEGMENT: {trans_len} chars → 1 segment (threshold: {cfg.max_segment_length})")
+        return {"transcription_segments": [state.transcription]}
 
     try:
-        llm = get_llm()
-        response = await llm.ainvoke(messages)
-        logger.info("LLM content check completed")
-        logger.debug(f"LLM response preview: {response.content[:500]}")
+        messages = [HumanMessage(content=cfg.segmentation_prompt.format(transcription=state.transcription))]
+        response = await get_llm().ainvoke(messages)
+        segments = json.loads(response.content).get("segments", [state.transcription])
+
+        logger.info(f"→ SEGMENT: {trans_len} chars → {len(segments)} segments (threshold: {cfg.max_segment_length})")
+        return {"transcription_segments": segments}
+    except Exception:
+        logger.exception("Segmentation failed, using single segment")
+        return {"transcription_segments": [state.transcription]}
+
+
+async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
+    """Refine user-provided criteria using LLM."""
+    if not state.additional_criteria:
+        return {"refined_criteria": []}
+
+    cfg = Configuration.from_runnable_config(config)
+    criteria_text = "\n".join(f"- {criterion}" for criterion in state.additional_criteria)
+
+    try:
+        messages = [HumanMessage(content=cfg.criteria_refinement_prompt.format(additional_criteria=criteria_text))]
+        response = await get_llm().ainvoke(messages)
+        refined = json.loads(response.content).get("criteria", [])
+
+        logger.info(f"→ REFINE: {len(state.additional_criteria)} criteria → {len(refined)} refined")
+        return {"refined_criteria": refined}
+    except Exception:
+        logger.exception("Criteria refinement failed, using original")
+        return {"refined_criteria": state.additional_criteria}
+
+async def content_check_node(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
+    """Detect extremist content in parallel batches."""
+    cfg = Configuration.from_runnable_config(config)
+    criteria_text = "\n".join(f"- {c}" for c in state.additional_criteria) if state.additional_criteria else "None"
+
+    logger.info(f"→ BATCH: Processing {len(state.transcription_segments)} segments in parallel")
+
+    try:
+        # Build messages for each segment
+        all_messages = [
+            [
+                SystemMessage(content=cfg.system_prompt),
+                HumanMessage(content=cfg.human_prompt.format(transcription=seg, additional_criteria=criteria_text))
+            ]
+            for seg in state.transcription_segments
+        ]
+
+        # Batch process all segments in parallel
+        responses = await get_llm().abatch(all_messages)
+
+        # Parse and concatenate all spans
+        all_spans = []
+        span_counts = []
+        for response in responses:
+            spans = json.loads(response.content).get("spans", [])
+            all_spans.extend(spans)
+            span_counts.append(len(spans))
+
+        logger.info(f"→ BATCH: Completed - found {len(all_spans)} spans total ({', '.join(f'seg{i+1}: {c}' for i, c in enumerate(span_counts))})")
 
         return {
-            "messages": messages + [response],
-            "response": response.content
+            "messages": all_messages[0] + [responses[0]] if responses else [],
+            "response": json.dumps({"spans": all_spans})
         }
-    except Exception as e:
-        logger.error(f"Error during LLM invocation in content_check_node: {e}")
-        logger.error(traceback.format_exc())
+    except Exception:
+        logger.exception("Batch content check failed")
         raise

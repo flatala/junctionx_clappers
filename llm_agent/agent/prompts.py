@@ -13,6 +13,29 @@ RULES
 - Output JSON only. No explanations outside the schema. No chain-of-thought.
 """
 
+SEGMENT_PROMPT = """Split the following transcript into logical chunks for analysis.
+
+TRANSCRIPT:
+{transcription}
+
+TASK:
+- Divide into coherent segments (by topic, speaker change, or natural breaks)
+- Each segment should be self-contained and meaningful
+- Preserve exact text, no summarization
+
+OUTPUT (JSON ONLY):
+{{
+  "segments": [
+    "segment 1 text...",
+    "segment 2 text..."
+  ]
+}}
+
+CONSTRAINTS:
+- Return ONLY valid JSON
+- Preserve all original text
+"""
+
 REFINE_CRITERIA = """You are refining user-supplied extremist classification criteria.
 
 INPUT:
@@ -49,8 +72,9 @@ Return ONLY this JSON schema:
 {{
   "spans": [
     {{
-      "text": "",      // exact text span from transcript
-      "rationale": ""  // brief explanation why this is extremist
+      "text": "",         // exact text span from transcript
+      "rationale": "",    // brief explanation why this is extremist
+      "confidence": 0.0   // confidence score 0.0-1.0
     }}
   ]
 }}
@@ -58,5 +82,6 @@ Return ONLY this JSON schema:
 Constraints:
 - If no extremist content: {{"spans": []}}
 - Keep spans minimal (no extra context)
+- Confidence: 0.0-1.0 (higher = more certain it's extremist)
 - Return ONLY valid JSON, no other text
 """

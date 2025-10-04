@@ -1,9 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 import json
 import logging
-import traceback
 from contextlib import asynccontextmanager
 
 from agent.graph import graph
@@ -13,7 +12,7 @@ from agent.utils import get_llm
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,7 @@ class ExtremistSpan(BaseModel):
     """Model for a detected extremist content span."""
     text: str = Field(..., description="The exact text span identified as extremist")
     rationale: str = Field(..., description="Explanation of why this span is extremist")
+    confidence: float = Field(..., description="Confidence score 0.0-1.0")
 
 
 class DetectionResponse(BaseModel):
@@ -41,20 +41,28 @@ class DetectionResponse(BaseModel):
     spans: List[ExtremistSpan] = Field(..., description="List of detected extremist spans")
 
 
+class CriteriaRequest(BaseModel):
+    """Request model for criteria refinement."""
+    criteria: List[str] = Field(..., description="List of raw criteria to refine")
+
+
+class CriteriaResponse(BaseModel):
+    """Response model for criteria refinement."""
+    refined_criteria: List[str] = Field(..., description="List of refined criteria")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event to pre-load the model on startup."""
     global llm_instance
-    logger.info("Starting up: Loading LLM model...")
     try:
         llm_instance = get_llm()
-        logger.info("LLM model loaded successfully!")
-    except Exception as e:
-        logger.error(f"Error loading model: {e}")
-        logger.error(traceback.format_exc())
+        logger.info("→ STARTUP: LLM model loaded")
+    except Exception:
+        logger.exception("Failed to load LLM model")
         raise
     yield
-    logger.info("Shutting down...")
+    logger.info("→ SHUTDOWN: Complete")
 
 
 app = FastAPI(
@@ -75,69 +83,54 @@ async def health_check():
     }
 
 
-@app.post("/detect", response_model=DetectionResponse)
-async def detect_extremist_content(request: DetectionRequest):
-    """
-    Detect extremist content in transcribed text.
-
-    Args:
-        request: Detection request with transcription and optional additional criteria
-
-    Returns:
-        Detection response with identified extremist spans
-    """
-    logger.info(
-        f"Received detection request - transcription length: {len(request.transcription)}, "
-        f"additional criteria count: {len(request.additional_criteria)}"
-    )
-
+@app.post("/refine-criteria", response_model=CriteriaResponse)
+async def refine_criteria_endpoint(request: CriteriaRequest):
+    """Refine user-provided criteria using LLM."""
     if llm_instance is None:
-        logger.error("Model not loaded yet")
-        raise HTTPException(status_code=503, detail="Model not loaded yet")
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    if not request.criteria:
+        return CriteriaResponse(refined_criteria=[])
 
     try:
-        # Initialize state
+        from agent.nodes import refine_criteria
+        from agent.agent_state import AgentState
+
+        temp_state = AgentState(transcription="", additional_criteria=request.criteria)
+        result = await refine_criteria(temp_state)
+
+        return CriteriaResponse(refined_criteria=result.get("refined_criteria", []))
+    except Exception:
+        logger.exception("Criteria refinement failed")
+        raise HTTPException(status_code=500, detail="Criteria refinement failed")
+
+
+@app.post("/detect", response_model=DetectionResponse)
+async def detect_extremist_content(request: DetectionRequest):
+    """Detect extremist content in transcribed text."""
+    logger.info(f"→ REQUEST: {len(request.transcription)} chars, {len(request.additional_criteria)} criteria")
+
+    if llm_instance is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    try:
         initial_state = AgentState(
             transcription=request.transcription,
             additional_criteria=request.additional_criteria
         )
 
-        # Run the graph
-        logger.info("Starting graph execution...")
         result = await graph.ainvoke(initial_state)
-        logger.info("Graph execution completed")
+        parsed_response = json.loads(result["response"])
+        spans = [ExtremistSpan(**span) for span in parsed_response.get("spans", [])]
 
-        # Parse the response
-        try:
-            logger.debug(f"Raw LLM response: {result.get('response', 'N/A')[:500]}")
-            parsed_response = json.loads(result["response"])
-
-            # Validate and convert to response model
-            spans = [
-                ExtremistSpan(**span) for span in parsed_response.get("spans", [])
-            ]
-
-            logger.info(f"Successfully detected {len(spans)} extremist spans")
-            return DetectionResponse(spans=spans)
-
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing failed: {e}")
-            logger.error(f"Raw response that failed to parse: {result.get('response', 'N/A')}")
-            logger.error(traceback.format_exc())
-            # If JSON parsing fails, return empty spans
-            return DetectionResponse(spans=[])
-        except (KeyError, TypeError, ValueError) as e:
-            logger.error(f"Error processing response structure: {e}")
-            logger.error(f"Response data: {result}")
-            logger.error(traceback.format_exc())
-            return DetectionResponse(spans=[])
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error during detection: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error during detection: {str(e)}")
+        logger.info(f"→ RESULT: {len(spans)} spans detected")
+        return DetectionResponse(spans=spans)
+    except json.JSONDecodeError:
+        logger.exception("JSON parsing failed, returning empty spans")
+        return DetectionResponse(spans=[])
+    except Exception:
+        logger.exception("Detection failed")
+        raise HTTPException(status_code=500, detail="Detection failed")
 
 
 @app.get("/")
@@ -148,6 +141,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "health": "/health",
+            "refine_criteria": "POST /refine-criteria",
             "detect": "POST /detect",
             "docs": "/docs"
         }
