@@ -26,4 +26,4 @@ echo "Model ready! Starting FastAPI server..."
 
 # Start FastAPI with uvicorn
 cd /app
-exec uvicorn api:app --host 0.0.0.0 --port 8001
+exec uvicorn app.api:app --host 0.0.0.0 --port 8001

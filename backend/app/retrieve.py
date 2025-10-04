@@ -1,15 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from pathlib import Path
-from typing import List
-import os
-import mimetypes
-import json
-
 from app.database import get_db
 from app.models import Batch, Job
 from app.schemas import BatchResponse, JobAnalysisResult, AnalysisSpan, JobInfo
+import os
+import mimetypes
+import json
+from pathlib import Path
 
 router = APIRouter()
 
@@ -65,8 +63,11 @@ async def retrieve_status_and_processed(job_id: str, db: Session = Depends(get_d
     if job.status == "transcribing":
         return to_return
 
-    transcription_path = os.path.join("uploads", f"{job_id}.txt")
-    if os.path.exists(transcription_path):
+    if not job.original_file_path:
+        return to_return
+
+    transcription_path = Path(job.original_file_path).with_suffix('.txt')
+    if transcription_path.exists():
         with open(transcription_path, "r") as f:
             to_return["transcript_text"] = f.read()
     else:
@@ -75,8 +76,8 @@ async def retrieve_status_and_processed(job_id: str, db: Session = Depends(get_d
     if job.status == "analysing":
         return to_return
 
-    json_path = os.path.join("uploads", f"{job_id}.json")
-    if os.path.exists(json_path):
+    json_path = Path(job.original_file_path).with_suffix('.json')
+    if json_path.exists():
         with open(json_path, "r") as f:
             to_return["spans"] = json.load(f)
     else:
@@ -91,7 +92,7 @@ async def get_batch(batch_id: str, db: Session = Depends(get_db)):
     batch = db.get(Batch, batch_id)
     if batch is None:
         raise HTTPException(status_code=404, detail="Batch not found")
-    
+
     jobs = []
     for job in batch.jobs:
         jobs.append(JobInfo(
@@ -99,7 +100,7 @@ async def get_batch(batch_id: str, db: Session = Depends(get_db)):
             filename=job.original_filename or f"job_{job.id}",
             status=job.status
         ))
-    
+
     return BatchResponse(
         name=batch.name,
         description=batch.description,
@@ -107,24 +108,76 @@ async def get_batch(batch_id: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/batch/{batch_id}/status")
-async def get_batch_status(batch_id: str, db: Session = Depends(get_db)):
-    """Get status of all jobs in a batch"""
-    batch = db.query(Batch).filter(Batch.id == batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=404, detail="Batch not found")
-    
-    jobs_status = []
-    for job in batch.jobs:
-        jobs_status.append({
-            "job_id": job.id,
-            "name": job.original_filename or job.id,
-            "status": job.status
-        })
-    
-    return {
-        "batch_id": batch.id,
-        "batch_status": batch.status,
-        "jobs": jobs_status
-    }
+@router.get("/batch/{batch_id}/{job_id}", response_model=JobAnalysisResult)
+async def get_job_analysis(batch_id: str, job_id: str, db: Session = Depends(get_db)):
+    """Get job analysis results"""
+    job = db.query(Job).filter(Job.id == job_id, Job.batch_id == batch_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail=f"Job not completed yet. Current status: {job.status}")
+
+    # Read analysis results from JSON file
+    if not job.original_file_path:
+        raise HTTPException(status_code=404, detail="Original file path not found")
+
+    json_path = Path(job.original_file_path).with_suffix('.json')
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Analysis results file not found")
+
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            analysis_data = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read analysis results: {str(e)}")
+
+    # Convert analysis data to response format
+    spans = []
+    if "spans" in analysis_data:
+        for span in analysis_data["spans"]:
+            # Convert start/end to strings if they are floats
+            start = span.get("start", "00:00:00.000")
+            end = span.get("end", "00:00:00.000")
+            
+            # Convert float timestamps to string format
+            if isinstance(start, (int, float)):
+                start = str(start)
+            if isinstance(end, (int, float)):
+                end = str(end)
+            
+            spans.append(AnalysisSpan(
+                start=start,
+                end=end,
+                text=span.get("text", ""),
+                rationale=span.get("rationale", "")
+            ))
+
+    return JobAnalysisResult(
+        audio_file_id=job.original_filename or job.id,
+        transcript_text=analysis_data.get("transcript_text", ""),
+        spans=spans
+    )
+
+
+@router.get("/batch/{batch_id}/{job_id}/file")
+async def get_job_file(batch_id: str, job_id: str, db: Session = Depends(get_db)):
+    """Get the original audio file for a job"""
+    job = db.query(Job).filter(Job.id == job_id, Job.batch_id == batch_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not job.original_file_path or not os.path.exists(job.original_file_path):
+        raise HTTPException(status_code=404, detail="Original file not found")
+
+    # Determine media type based on extension
+    media_type, _ = mimetypes.guess_type(job.original_file_path)
+    if media_type is None:
+        media_type = "application/octet-stream"
+
+    return FileResponse(
+        path=job.original_file_path,
+        media_type=media_type,
+        filename=job.original_filename or Path(job.original_file_path).name
+    )
 
