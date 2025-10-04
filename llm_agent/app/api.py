@@ -1,13 +1,18 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import List
 import json
 import logging
 from contextlib import asynccontextmanager
 
-from agent.graph import graph
-from agent.agent_state import AgentState
-from agent.utils import get_llm
+from .agent.graph import graph
+from .agent.agent_state import AgentState
+from .agent.utils import get_llm
+from .models import (
+    DetectionRequest,
+    DetectionResponse,
+    ExtremistSpan,
+    CriteriaRequest,
+    CriteriaResponse
+)
 
 # Configure logging
 logging.basicConfig(
@@ -18,37 +23,6 @@ logger = logging.getLogger(__name__)
 
 # Global LLM instance
 llm_instance = None
-
-
-class DetectionRequest(BaseModel):
-    """Request model for extremist content detection."""
-    transcription: str = Field(..., description="Transcribed text to analyze")
-    additional_criteria: List[str] = Field(
-        default_factory=list,
-        description="Additional criteria for extremist content detection"
-    )
-
-
-class ExtremistSpan(BaseModel):
-    """Model for a detected extremist content span."""
-    text: str = Field(..., description="The exact text span identified as extremist")
-    rationale: str = Field(..., description="Explanation of why this span is extremist")
-    confidence: float = Field(..., description="Confidence score 0.0-1.0")
-
-
-class DetectionResponse(BaseModel):
-    """Response model for extremist content detection."""
-    spans: List[ExtremistSpan] = Field(..., description="List of detected extremist spans")
-
-
-class CriteriaRequest(BaseModel):
-    """Request model for criteria refinement."""
-    criteria: List[str] = Field(..., description="List of raw criteria to refine")
-
-
-class CriteriaResponse(BaseModel):
-    """Response model for criteria refinement."""
-    refined_criteria: List[str] = Field(..., description="List of refined criteria")
 
 
 @asynccontextmanager
@@ -93,8 +67,8 @@ async def refine_criteria_endpoint(request: CriteriaRequest):
         return CriteriaResponse(refined_criteria=[])
 
     try:
-        from agent.nodes import refine_criteria
-        from agent.agent_state import AgentState
+        from .agent.nodes import refine_criteria
+        from .agent.agent_state import AgentState
 
         temp_state = AgentState(transcription="", additional_criteria=request.criteria)
         result = await refine_criteria(temp_state)

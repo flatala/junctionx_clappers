@@ -63,4 +63,4 @@ echo ""
 echo "LLM Agent: http://localhost:8001"
 echo "Docs: http://localhost:8001/docs"
 echo ""
-mamba run -n ${ENV_NAME} uvicorn api:app --host 0.0.0.0 --port 8001 --reload
+mamba run -n ${ENV_NAME} uvicorn app.api:app --host 0.0.0.0 --port 8001 --reload
