@@ -14,11 +14,26 @@ export class ApiError extends Error {
 }
 
 export const api = {
-  async uploadAudio(file: File): Promise<WhisperResponse> {
+  // Upload batch of files
+  async uploadBatch(batchData: {
+    name: string;
+    description: string;
+    files: File[];
+    extremismDefinition?: string;
+  }): Promise<{ batch_id: string }> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('name', batchData.name);
+    formData.append('description', batchData.description);
+    
+    if (batchData.extremismDefinition) {
+      formData.append('extremism_definition', batchData.extremismDefinition);
+    }
+    
+    batchData.files.forEach((file) => {
+      formData.append('files', file);
+    });
 
-    const response = await fetch(`${API_BASE_URL}/upload-audio`, {
+    const response = await fetch(`${API_BASE_URL}/upload/`, {
       method: 'POST',
       body: formData,
     });
@@ -32,6 +47,51 @@ export const api = {
     }
 
     return response.json();
+  },
+
+  // Get batch details
+  async getBatch(batchId: string): Promise<BatchDetails> {
+    const response = await fetch(`${API_BASE_URL}/batch/${batchId}`);
+    
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to fetch batch: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    return response.json();
+  },
+
+  // Get job details within a batch
+  async getJob(batchId: string, jobId: string): Promise<JobAnalysisResult> {
+    const response = await fetch(`${API_BASE_URL}/batch/${batchId}/${jobId}`);
+    
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to fetch job: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    return response.json();
+  },
+
+  // Get audio file for a job
+  async getJobAudioFile(batchId: string, jobId: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/batch/${batchId}/${jobId}/file`);
+    
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to fetch audio file: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    return response.blob();
   },
 
   async healthCheck(): Promise<{ status: string; database: string }> {
@@ -49,7 +109,40 @@ export const api = {
   }
 };
 
-// Type definitions for the Whisper API response
+// Type definitions for batch workflow
+
+export interface JobInfo {
+  job_id: string;
+  filename: string;
+  status: string;
+}
+
+export interface BatchDetails {
+  name: string;
+  description: string;
+  jobs: JobInfo[];
+}
+
+export interface JobAnalysisResult {
+  audio_file_id: string;
+  transcript_text: string;
+  spans: AnalysisSpan[];
+}
+
+export interface AnalysisSpan {
+  start: string;
+  end: string;
+  text: string;
+  rationale: string;
+}
+
+export interface JobStatus {
+  job_id: string;
+  name: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+}
+
+// Legacy type definitions for backward compatibility
 export interface WhisperResponse {
   text: string;
   segments: WhisperSegment[];

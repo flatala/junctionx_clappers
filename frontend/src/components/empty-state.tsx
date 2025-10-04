@@ -1,16 +1,26 @@
 import { Card, CardContent } from './ui/card';
 import { Zap } from 'lucide-react';
 
-export default function EmptyState() {
+interface EmptyStateProps {
+  title?: string;
+  description?: string;
+  icon?: React.ReactNode;
+}
+
+export default function EmptyState({ 
+  title = "Ready to Analyze",
+  description = "Upload an audio or video file to get started with content analysis",
+  icon = <Zap className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+}: EmptyStateProps) {
   return (
     <Card className="h-96 flex items-center justify-center">
       <CardContent className="text-center">
-        <Zap className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+        {icon}
         <h3 className="text-lg font-medium mb-2">
-          Ready to Analyze
+          {title}
         </h3>
         <p className="text-muted-foreground">
-          Upload an audio or video file to get started with content analysis
+          {description}
         </p>
       </CardContent>
     </Card>
