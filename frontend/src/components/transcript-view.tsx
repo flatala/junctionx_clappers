@@ -22,7 +22,7 @@ export default function TranscriptView({ segments, isVisible }: TranscriptViewPr
   if (!isVisible) return null;
 
   return (
-    <Card>
+    <Card className='h-full'>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
@@ -30,7 +30,7 @@ export default function TranscriptView({ segments, isVisible }: TranscriptViewPr
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-96 w-full">
+        <ScrollArea className="w-full">
           <div className="space-y-3">
             {segments.map((segment) => (
               <TranscriptSegmentItem

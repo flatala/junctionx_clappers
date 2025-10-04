@@ -18,13 +18,21 @@ export default function ExportActions({ onDownloadJson, onDownloadCsv }: ExportA
       </CardHeader>
       <CardContent>
         <div className="flex gap-3">
-          <Button onClick={onDownloadJson} variant="outline" className="flex-1">
-            <Download className="h-4 w-4 mr-2" />
-            Download JSON
+          <Button
+            onClick={onDownloadJson}
+            variant="outline"
+            className="flex-1 min-w-0 h-auto whitespace-normal break-words text-center"
+          >
+            <Download className="h-4 w-4 mr-2 shrink-0" />
+            <span className="min-w-0 break-words">Download JSON</span>
           </Button>
-          <Button onClick={onDownloadCsv} variant="outline" className="flex-1">
-            <Download className="h-4 w-4 mr-2" />
-            Download CSV
+          <Button
+            onClick={onDownloadCsv}
+            variant="outline"
+            className="flex-1 min-w-0 h-auto whitespace-normal break-words text-center"
+          >
+            <Download className="h-4 w-4 mr-2 shrink-0" />
+            <span className="min-w-0 break-words">Download CSV</span>
           </Button>
         </div>
       </CardContent>
