@@ -26,7 +26,7 @@ class Batch(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     default_definitions = Column(Text, nullable=True)  # JSON array
-    custom_definitions = Column(Text, nullable=True)  # JSON array
+    positive_examples = Column(Text, nullable=True)  # JSON array
     negative_examples = Column(Text, nullable=True)  # JSON array
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String(50), default="processing")  # processing, completed, failed
@@ -47,18 +47,18 @@ class Batch(Base):
         """Set default_definitions from list"""
         self.default_definitions = json.dumps(data) if data else None
 
-    def get_custom_definitions(self):
-        """Parse custom_definitions JSON string to list"""
-        if self.custom_definitions:
+    def get_positive_examples(self):
+        """Parse positive_examples JSON string to list"""
+        if self.positive_examples:
             try:
-                return json.loads(self.custom_definitions)
+                return json.loads(self.positive_examples)
             except json.JSONDecodeError:
                 return []
         return []
 
-    def set_custom_definitions(self, data):
-        """Set custom_definitions from list"""
-        self.custom_definitions = json.dumps(data) if data else None
+    def set_positive_examples(self, data):
+        """Set positive_examples from list"""
+        self.positive_examples = json.dumps(data) if data else None
 
     def get_negative_examples(self):
         """Parse negative_examples JSON string to list"""

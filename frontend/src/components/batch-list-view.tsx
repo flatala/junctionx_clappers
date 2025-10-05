@@ -26,7 +26,7 @@ export default function BatchListView() {
     description: '',
     files: [] as File[],
     defaultDefinitions: DEFAULT_EXTREMISM_DEFINITIONS,
-    customDefinitions: [''] as string[],
+    positiveExamples: [''] as string[],
     negativeExamples: [''] as string[]
   });
 
@@ -78,30 +78,14 @@ export default function BatchListView() {
 
     setIsUploading(true);
     try {
-      // Collect all user feedback as custom definitions and negative examples
-      const allPositiveExamples = new Set<string>();
-      const allNegativeExamples = new Set<string>();
-      
-      batchFeedback.forEach((feedback) => {
-        feedback.positive_examples.forEach(ex => allPositiveExamples.add(ex));
-        feedback.negative_examples.forEach(ex => allNegativeExamples.add(ex));
-      });
-      
-      // Merge with form data
-      const customDefsList = [
-        ...formData.customDefinitions.filter(d => d.trim() !== ''),
-        ...Array.from(allNegativeExamples) // User marked as extremist
-      ];
-      
-      const negativeExList = [
-        ...formData.negativeExamples.filter(e => e.trim() !== ''),
-        ...Array.from(allPositiveExamples) // User marked as normal
-      ];
-      
+      // Merge form data with any additional user-edited examples
+      const positiveExList = formData.positiveExamples.filter(e => e.trim() !== '');
+      const negativeExList = formData.negativeExamples.filter(e => e.trim() !== '');
+
       // Filter out empty strings and duplicates
       const result = await api.uploadBatch({
         ...formData,
-        customDefinitions: Array.from(new Set(customDefsList)),
+        positiveExamples: Array.from(new Set(positiveExList)),
         negativeExamples: Array.from(new Set(negativeExList))
       });
       storage.addBatchId(result.batch_id);
@@ -112,11 +96,11 @@ export default function BatchListView() {
         description: '',
         files: [],
         defaultDefinitions: DEFAULT_EXTREMISM_DEFINITIONS,
-        customDefinitions: [''],
+        positiveExamples: [''],
         negativeExamples: ['']
       });
       setShowCreateForm(false);
-      
+
       // Reload batches
       await loadBatches();
     } catch (error) {
@@ -155,7 +139,26 @@ export default function BatchListView() {
           <h1 className="text-3xl font-bold">Audio Analysis Batches</h1>
           <p className="text-muted-foreground">Manage and monitor your audio analysis projects</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)} disabled={showCreateForm}>
+        <Button onClick={() => {
+          // Pre-populate form with feedback from previous batches
+          const allPositiveFromFeedback = new Set<string>();
+          const allNegativeFromFeedback = new Set<string>();
+
+          batchFeedback.forEach((feedback) => {
+            feedback.positive_examples.forEach(ex => allNegativeFromFeedback.add(ex)); // User marked as normal
+            feedback.negative_examples.forEach(ex => allPositiveFromFeedback.add(ex)); // User marked as extremist
+          });
+
+          setFormData({
+            name: '',
+            description: '',
+            files: [],
+            defaultDefinitions: DEFAULT_EXTREMISM_DEFINITIONS,
+            positiveExamples: Array.from(allPositiveFromFeedback).length > 0 ? Array.from(allPositiveFromFeedback) : [''],
+            negativeExamples: Array.from(allNegativeFromFeedback).length > 0 ? Array.from(allNegativeFromFeedback) : ['']
+          });
+          setShowCreateForm(true);
+        }} disabled={showCreateForm}>
           <Plus className="w-4 h-4 mr-2" />
           Create Batch
         </Button>
@@ -164,80 +167,24 @@ export default function BatchListView() {
       {showCreateForm && (
         <Card>
           <CardHeader>
+            {/* Show feedback usage indicator */}
+            {Array.from(batchFeedback.values()).some(f => f.positive_examples.length > 0 || f.negative_examples.length > 0) && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                  Using Previous Feedback
+                </span>
+                <span className="text-xs text-green-700 dark:text-green-300">
+                  ({Array.from(batchFeedback.values()).reduce((sum, f) => sum + f.positive_examples.length + f.negative_examples.length, 0)} examples pre-filled)
+                </span>
+              </div>
+            )}
             <CardTitle>Create New Batch</CardTitle>
             <CardDescription>
               Upload multiple audio files for analysis as a batch
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Show user feedback will be used */}
-            {Array.from(batchFeedback.values()).some(f => f.positive_examples.length > 0 || f.negative_examples.length > 0) && (
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-1">
-                      Human Feedback Will Be Applied
-                    </p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
-                      This batch will automatically use feedback from previous batches to improve accuracy:
-                    </p>
-                    
-                    {/* Collect all feedback */}
-                    {(() => {
-                      const allPositiveExamples = new Set<string>();
-                      const allNegativeExamples = new Set<string>();
-                      
-                      batchFeedback.forEach((feedback) => {
-                        feedback.positive_examples.forEach(ex => allPositiveExamples.add(ex));
-                        feedback.negative_examples.forEach(ex => allNegativeExamples.add(ex));
-                      });
-                      
-                      return (
-                        <div className="space-y-3">
-                          {allNegativeExamples.size > 0 && (
-                            <div className="border-l-2 border-orange-500 pl-3">
-                              <div className="flex items-center gap-1 mb-2">
-                                <AlertTriangle className="w-4 h-4 text-orange-600" />
-                                <span className="text-xs font-semibold text-orange-900 dark:text-orange-100">
-                                  {allNegativeExamples.size} phrase{allNegativeExamples.size !== 1 ? 's' : ''} will be added as Custom Definitions (positive examples):
-                                </span>
-                              </div>
-                              <div className="space-y-1 max-h-40 overflow-y-auto">
-                                {Array.from(allNegativeExamples).map((phrase, idx) => (
-                                  <div key={idx} className="text-xs bg-orange-100 dark:bg-orange-900/20 text-orange-900 dark:text-orange-100 px-2 py-1 rounded">
-                                    "{phrase}"
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {allPositiveExamples.size > 0 && (
-                            <div className="border-l-2 border-green-500 pl-3">
-                              <div className="flex items-center gap-1 mb-2">
-                                <CheckCircle className="w-4 h-4 text-green-600" />
-                                <span className="text-xs font-semibold text-green-900 dark:text-green-100">
-                                  {allPositiveExamples.size} phrase{allPositiveExamples.size !== 1 ? 's' : ''} will be added as Negative Examples (false positives):
-                                </span>
-                              </div>
-                              <div className="space-y-1 max-h-40 overflow-y-auto">
-                                {Array.from(allPositiveExamples).map((phrase, idx) => (
-                                  <div key={idx} className="text-xs bg-green-100 dark:bg-green-900/20 text-green-900 dark:text-green-100 px-2 py-1 rounded">
-                                    "{phrase}"
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            )}
-            
             <div>
               <label htmlFor="name" className="block text-sm font-medium mb-2">
                 Batch Name *
@@ -297,34 +244,50 @@ export default function BatchListView() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Custom Definitions
-                <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
-              </label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-sm font-medium">
+                  Positive Examples
+                  <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
+                </label>
+                {(() => {
+                  const feedbackCount = Array.from(batchFeedback.values()).reduce((sum, f) => sum + f.negative_examples.length, 0);
+                  return feedbackCount > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/20 rounded text-xs text-orange-700 dark:text-orange-300">
+                      <AlertTriangle className="w-3 h-3" />
+                      <span>{feedbackCount} from feedback</span>
+                    </div>
+                  );
+                })()}
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Concrete examples of extremist content TO flag.
+              </p>
               <div className="space-y-2">
-                {formData.customDefinitions.map((definition, index) => (
+                {formData.positiveExamples.map((example, index) => (
                   <div key={index} className="flex gap-2">
                     <Input
-                      value={definition}
+                      value={example}
                       onChange={(e) => {
-                        const newCustom = [...formData.customDefinitions];
-                        newCustom[index] = e.target.value;
-                        setFormData({ ...formData, customDefinitions: newCustom });
+                        const newPositive = [...formData.positiveExamples];
+                        newPositive[index] = e.target.value;
+                        setFormData({ ...formData, positiveExamples: newPositive });
                       }}
-                      placeholder="Enter custom extremism definition..."
+                      placeholder="e.g., Kill all infidels, Death to traitors..."
                     />
-                    {formData.customDefinitions.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const newCustom = formData.customDefinitions.filter((_, i) => i !== index);
-                          setFormData({ ...formData, customDefinitions: newCustom });
-                        }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newPositive = formData.positiveExamples.filter((_, i) => i !== index);
+                        // Ensure at least one empty field remains
+                        if (newPositive.length === 0) {
+                          newPositive.push('');
+                        }
+                        setFormData({ ...formData, positiveExamples: newPositive });
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -333,22 +296,33 @@ export default function BatchListView() {
                 size="sm"
                 onClick={() => setFormData({
                   ...formData,
-                  customDefinitions: [...formData.customDefinitions, '']
+                  positiveExamples: [...formData.positiveExamples, '']
                 })}
                 className="mt-2"
               >
                 <Plus className="w-4 h-4 mr-1" />
-                Add Custom Definition
+                Add Positive Example
               </Button>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Negative Examples
-                <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
-              </label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-sm font-medium">
+                  Negative Examples
+                  <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
+                </label>
+                {(() => {
+                  const feedbackCount = Array.from(batchFeedback.values()).reduce((sum, f) => sum + f.positive_examples.length, 0);
+                  return feedbackCount > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/20 rounded text-xs text-green-700 dark:text-green-300">
+                      <CheckCircle className="w-3 h-3" />
+                      <span>{feedbackCount} from feedback</span>
+                    </div>
+                  );
+                })()}
+              </div>
               <p className="text-xs text-muted-foreground mb-2">
-                Specify what should not be considered extremist content.
+                Concrete examples of normal content NOT to flag.
               </p>
               <div className="space-y-2">
                 {formData.negativeExamples.map((example, index) => (
@@ -362,18 +336,20 @@ export default function BatchListView() {
                       }}
                       placeholder="e.g., News reporting, Academic discussion..."
                     />
-                    {formData.negativeExamples.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const newNegative = formData.negativeExamples.filter((_, i) => i !== index);
-                          setFormData({ ...formData, negativeExamples: newNegative });
-                        }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newNegative = formData.negativeExamples.filter((_, i) => i !== index);
+                        // Ensure at least one empty field remains
+                        if (newNegative.length === 0) {
+                          newNegative.push('');
+                        }
+                        setFormData({ ...formData, negativeExamples: newNegative });
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
                 ))}
               </div>

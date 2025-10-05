@@ -20,7 +20,7 @@ export const api = {
     description: string;
     files: File[];
     defaultDefinitions?: string[];
-    customDefinitions?: string[];
+    positiveExamples?: string[];
     negativeExamples?: string[];
   }): Promise<{ batch_id: string }> {
     const formData = new FormData();
@@ -29,7 +29,7 @@ export const api = {
 
     // Convert arrays to JSON strings
     formData.append('default_definitions', JSON.stringify(batchData.defaultDefinitions || []));
-    formData.append('custom_definitions', JSON.stringify(batchData.customDefinitions || []));
+    formData.append('positive_examples', JSON.stringify(batchData.positiveExamples || []));
     formData.append('negative_examples', JSON.stringify(batchData.negativeExamples || []));
 
     batchData.files.forEach((file) => {

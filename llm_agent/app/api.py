@@ -9,9 +9,7 @@ from .agent.utils import get_llm
 from .models import (
     DetectionRequest,
     DetectionResponse,
-    ExtremistSpan,
-    CriteriaRequest,
-    CriteriaResponse
+    ExtremistSpan
 )
 
 # Configure logging
@@ -57,59 +55,36 @@ async def health_check():
     }
 
 
-@app.post("/refine-criteria", response_model=CriteriaResponse)
-async def refine_criteria_endpoint(request: CriteriaRequest):
-    """Refine user-provided criteria using LLM."""
-    if llm_instance is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-
-    if not request.criteria:
-        return CriteriaResponse(refined_criteria=[])
-
-    try:
-        from .agent.nodes import refine_criteria
-        from .agent.agent_state import AgentState
-
-        temp_state = AgentState(transcription="", additional_criteria=request.criteria)
-        result = await refine_criteria(temp_state)
-
-        return CriteriaResponse(refined_criteria=result.get("refined_criteria", []))
-    except Exception:
-        logger.exception("Criteria refinement failed")
-        raise HTTPException(status_code=500, detail="Criteria refinement failed")
-
-
 @app.post("/detect", response_model=DetectionResponse)
 async def detect_extremist_content(request: DetectionRequest):
     """Detect extremist content in transcribed text."""
-    total_criteria = len(request.default_definitions) + len(request.custom_definitions)
-    logger.info(f"→ REQUEST: {len(request.transcription)} chars, {total_criteria} criteria ({len(request.default_definitions)} default, {len(request.custom_definitions)} custom), {len(request.negative_examples)} negative examples")
-    
+    logger.info(f"→ REQUEST: {len(request.transcription)} chars, {len(request.default_definitions)} criteria, {len(request.positive_examples)} positive examples, {len(request.negative_examples)} negative examples")
+
     # Log detailed request information
     logger.info("\n" + "=" * 80)
     logger.info("INCOMING REQUEST TO /detect ENDPOINT:")
     logger.info("=" * 80)
     logger.info(f"\n📝 TRANSCRIPTION LENGTH: {len(request.transcription)} characters")
     logger.info(f"First 200 chars: {request.transcription[:200]}...")
-    
-    logger.info(f"\n📋 DEFAULT DEFINITIONS ({len(request.default_definitions)}):")
+
+    logger.info(f"\n📋 EXTREMISM CRITERIA ({len(request.default_definitions)}):")
     for i, definition in enumerate(request.default_definitions, 1):
         logger.info(f"   {i}. {definition}")
-    
-    logger.info(f"\n🎯 CUSTOM DEFINITIONS ({len(request.custom_definitions)}):")
-    if request.custom_definitions:
-        for i, definition in enumerate(request.custom_definitions, 1):
-            logger.info(f"   {i}. {definition}")
+
+    logger.info(f"\n✅ POSITIVE EXAMPLES ({len(request.positive_examples)}):")
+    if request.positive_examples:
+        for i, example in enumerate(request.positive_examples, 1):
+            logger.info(f"   {i}. {example}")
     else:
         logger.info("   (none - no user feedback)")
-    
-    logger.info(f"\n✅ NEGATIVE EXAMPLES ({len(request.negative_examples)}):")
+
+    logger.info(f"\n❌ NEGATIVE EXAMPLES ({len(request.negative_examples)}):")
     if request.negative_examples:
         for i, example in enumerate(request.negative_examples, 1):
             logger.info(f"   {i}. {example}")
     else:
         logger.info("   (none - no user corrections)")
-    
+
     logger.info("=" * 80 + "\n")
 
     if llm_instance is None:
@@ -119,7 +94,7 @@ async def detect_extremist_content(request: DetectionRequest):
         initial_state = AgentState(
             transcription=request.transcription,
             default_definitions=request.default_definitions,
-            custom_definitions=request.custom_definitions,
+            positive_examples=request.positive_examples,
             negative_examples=request.negative_examples
         )
 
@@ -145,7 +120,6 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "health": "/health",
-            "refine_criteria": "POST /refine-criteria",
             "detect": "POST /detect",
             "docs": "/docs"
         }

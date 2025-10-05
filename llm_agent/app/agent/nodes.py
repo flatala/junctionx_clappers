@@ -19,25 +19,6 @@ _SENTENCE_RE = re.compile(
     re.VERBOSE | re.UNICODE
 )
 
-async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
-    """Refine user-provided custom criteria using LLM (for future use)."""
-    if not state.custom_definitions:
-        return {"refined_criteria": []}
-
-    cfg = Configuration.from_runnable_config(config)
-    criteria_text = "\n".join(f"- {criterion}" for criterion in state.custom_definitions)
-
-    try:
-        messages = [HumanMessage(content=cfg.criteria_refinement_prompt.format(additional_criteria=criteria_text))]
-        response = await get_llm().ainvoke(messages)
-        refined = json.loads(response.content).get("criteria", [])
-
-        logger.info(f"→ REFINE: {len(state.custom_definitions)} custom criteria → {len(refined)} refined")
-        return {"refined_criteria": refined}
-    except Exception:
-        logger.exception("Criteria refinement failed, using original")
-        return {"refined_criteria": state.custom_definitions}
-
 def _sentences(text: str) -> List[str]:
     """Regex-based sentence splitter; trims empties."""
     return [m.group(0).strip() for m in _SENTENCE_RE.finditer(text or "") if m.group(0).strip()]
@@ -217,11 +198,13 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
     """Detect extremist content in parallel batches."""
     cfg = Configuration.from_runnable_config(config)
 
-    # Combine default and custom definitions
-    all_criteria = state.default_definitions + state.custom_definitions
-    extremism_criteria = "\n".join(f"- {c}" for c in all_criteria) if all_criteria else "None provided"
+    # Format extremism criteria (only default definitions - abstract rules)
+    extremism_criteria = "\n".join(f"- {c}" for c in state.default_definitions) if state.default_definitions else "None provided"
 
-    # Format negative examples
+    # Format positive examples (concrete examples TO flag)
+    positive_examples = "\n".join(f"- {p}" for p in state.positive_examples) if state.positive_examples else "None provided"
+
+    # Format negative examples (concrete examples NOT to flag)
     negative_examples = "\n".join(f"- {n}" for n in state.negative_examples) if state.negative_examples else "None provided"
 
     logger.info(f"→ BATCH: Processing {len(state.transcription_segments)} segments in parallel")
@@ -230,25 +213,24 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
     logger.info("=" * 80)
     logger.info("CRITERIA AND EXAMPLES BEING SENT TO LLM:")
     logger.info("=" * 80)
-    logger.info(f"\n📋 DEFAULT DEFINITIONS ({len(state.default_definitions)}):")
+    logger.info(f"\n📋 EXTREMISM CRITERIA ({len(state.default_definitions)}):")
     for i, criterion in enumerate(state.default_definitions, 1):
         logger.info(f"   {i}. {criterion}")
-    
-    logger.info(f"\n🎯 CUSTOM DEFINITIONS ({len(state.custom_definitions)}):")
-    if state.custom_definitions:
-        for i, criterion in enumerate(state.custom_definitions, 1):
-            logger.info(f"   {i}. {criterion}")
+
+    logger.info(f"\n✅ POSITIVE EXAMPLES ({len(state.positive_examples)}):")
+    if state.positive_examples:
+        for i, example in enumerate(state.positive_examples, 1):
+            logger.info(f"   {i}. {example}")
     else:
         logger.info("   (none)")
-    
-    logger.info(f"\n✅ NEGATIVE EXAMPLES ({len(state.negative_examples)}):")
+
+    logger.info(f"\n❌ NEGATIVE EXAMPLES ({len(state.negative_examples)}):")
     if state.negative_examples:
         for i, example in enumerate(state.negative_examples, 1):
             logger.info(f"   {i}. {example}")
     else:
         logger.info("   (none)")
-    
-    logger.info(f"\n📊 TOTAL CRITERIA: {len(all_criteria)} (default + custom)")
+
     logger.info("=" * 80)
 
     try:
@@ -259,6 +241,7 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
                 HumanMessage(content=cfg.human_prompt.format(
                     transcription=seg,
                     extremism_criteria=extremism_criteria,
+                    positive_examples=positive_examples,
                     negative_examples=negative_examples
                 ))
             ]
@@ -279,6 +262,7 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
             formatted_prompt = cfg.human_prompt.format(
                 transcription=state.transcription_segments[0],
                 extremism_criteria=extremism_criteria,
+                positive_examples=positive_examples,
                 negative_examples=negative_examples
             )
             logger.info(formatted_prompt)
