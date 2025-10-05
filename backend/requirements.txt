@@ -11,5 +11,6 @@ faster-whisper
 python-multipart
 ffmpeg-python==0.2.0
 pydub==0.25.1
+moviepy
 librosa
 soundfile
