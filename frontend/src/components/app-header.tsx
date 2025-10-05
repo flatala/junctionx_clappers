@@ -12,31 +12,18 @@ export default function AppHeader() {
                 Perun
               </h1>
               <p className="hidden sm:block text-xs text-muted-foreground">
-                AI-Powered Content Analysis
+                AI-Powered Speech Analytics
               </p>
             </div>
           </div>
           
-          <nav className="flex items-center gap-4">
-            <a 
-              href="#features" 
+          <a 
+              href="/"
               className="hidden md:inline-flex text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Features
+              Home
             </a>
-            <a 
-              href="#about" 
-              className="hidden md:inline-flex text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              About
-            </a>
-            <a 
-              href="#contact" 
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Contact
-            </a>
-          </nav>
+            
         </div>
       </div>
     </header>
