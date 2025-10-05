@@ -34,7 +34,14 @@ class AgentConfiguration:
 
     # PARAMETERS
     max_segment_length: int = field(
-        default=500,
+        default=300,
+        metadata={
+            "description": "Maximum character length before segmenting transcription"
+        },
+    )
+
+    max_extension: int = field(
+        default=30,
         metadata={
             "description": "Maximum character length before segmenting transcription"
         },
