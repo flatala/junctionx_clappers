@@ -168,17 +168,30 @@ export default function BatchListView() {
         <Card>
           <CardHeader>
             {/* Show feedback usage indicator */}
-            {Array.from(batchFeedback.values()).some(f => f.positive_examples.length > 0 || f.negative_examples.length > 0) && (
-              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-medium text-green-900 dark:text-green-100">
-                  Using Previous Feedback
-                </span>
-                <span className="text-xs text-green-700 dark:text-green-300">
-                  ({Array.from(batchFeedback.values()).reduce((sum, f) => sum + f.positive_examples.length + f.negative_examples.length, 0)} examples pre-filled)
-                </span>
-              </div>
-            )}
+            {(() => {
+              // Count feedback items still present in the form
+              const allPositiveFeedback = new Set<string>();
+              const allNegativeFeedback = new Set<string>();
+              Array.from(batchFeedback.values()).forEach(f => {
+                f.negative_examples.forEach(ex => allPositiveFeedback.add(ex));
+                f.positive_examples.forEach(ex => allNegativeFeedback.add(ex));
+              });
+              const positiveCount = formData.positiveExamples.filter(ex => ex.trim() !== '' && allPositiveFeedback.has(ex)).length;
+              const negativeCount = formData.negativeExamples.filter(ex => ex.trim() !== '' && allNegativeFeedback.has(ex)).length;
+              const totalCount = positiveCount + negativeCount;
+
+              return totalCount > 0 && (
+                <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                    Using Previous Feedback
+                  </span>
+                  <span className="text-xs text-green-700 dark:text-green-300">
+                    ({totalCount} example{totalCount !== 1 ? 's' : ''} from feedback)
+                  </span>
+                </div>
+              );
+            })()}
             <CardTitle>Create New Batch</CardTitle>
             <CardDescription>
               Upload multiple audio files for analysis as a batch
@@ -250,7 +263,14 @@ export default function BatchListView() {
                   <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
                 </label>
                 {(() => {
-                  const feedbackCount = Array.from(batchFeedback.values()).reduce((sum, f) => sum + f.negative_examples.length, 0);
+                  // Count only feedback items that are still present in the form
+                  const allFeedbackItems = new Set<string>();
+                  Array.from(batchFeedback.values()).forEach(f => {
+                    f.negative_examples.forEach(ex => allFeedbackItems.add(ex));
+                  });
+                  const feedbackCount = formData.positiveExamples.filter(ex =>
+                    ex.trim() !== '' && allFeedbackItems.has(ex)
+                  ).length;
                   return feedbackCount > 0 && (
                     <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/20 rounded text-xs text-orange-700 dark:text-orange-300">
                       <AlertTriangle className="w-3 h-3" />
@@ -312,7 +332,14 @@ export default function BatchListView() {
                   <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
                 </label>
                 {(() => {
-                  const feedbackCount = Array.from(batchFeedback.values()).reduce((sum, f) => sum + f.positive_examples.length, 0);
+                  // Count only feedback items that are still present in the form
+                  const allFeedbackItems = new Set<string>();
+                  Array.from(batchFeedback.values()).forEach(f => {
+                    f.positive_examples.forEach(ex => allFeedbackItems.add(ex));
+                  });
+                  const feedbackCount = formData.negativeExamples.filter(ex =>
+                    ex.trim() !== '' && allFeedbackItems.has(ex)
+                  ).length;
                   return feedbackCount > 0 && (
                     <div className="flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/20 rounded text-xs text-green-700 dark:text-green-300">
                       <CheckCircle className="w-3 h-3" />
