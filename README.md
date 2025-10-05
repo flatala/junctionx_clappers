@@ -156,6 +156,10 @@ Once services are running, visit:
 - **LangGraph**: Agent orchestration framework
 - **FastAPI**: Service API
 
+## Gen AI Usage
+
+To make the application in the short time span we relied heavily on various AI tools, such as LLM webchats, Github Copilot and Claude Code.
+
 ## License
 
 MIT
