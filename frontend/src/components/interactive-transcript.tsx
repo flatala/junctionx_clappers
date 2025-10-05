@@ -47,6 +47,7 @@ interface TextSegment {
   text: string;
   span?: AnalysisSpan;
   isHighlighted: boolean;
+  userFeedback?: { text: string; feedback_type: string };
 }
 
 export default function InteractiveTranscript({ 
@@ -198,6 +199,7 @@ export default function InteractiveTranscript({
         text: highlight.text,
         span: highlight.span,
         isHighlighted: true,
+        userFeedback: highlight.userFeedback,
       });
 
       lastIndex = highlightIndex + highlight.text.length;
@@ -253,9 +255,9 @@ export default function InteractiveTranscript({
           </div>
         )}
         {segments.map((segment, index) => {
-          // Check if this segment has user feedback
-          const feedback = hasUserFeedback(segment.text);
-          
+          // Use segment's userFeedback if available, otherwise check by text
+          const feedback = segment.userFeedback || hasUserFeedback(segment.text);
+
           if (segment.isHighlighted) {
             // This is a highlighted segment (either AI-detected or user-marked)
             
