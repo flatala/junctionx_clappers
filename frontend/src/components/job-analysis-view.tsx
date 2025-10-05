@@ -304,6 +304,46 @@ export default function JobAnalysisView() {
             spans={analysisResult?.spans}
             ref={audioPlayerRef}
           />
+
+          {/* Detected Segments List */}
+          {analysisResult.spans.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Detected Extremist Segments</CardTitle>
+                <CardDescription>
+                  {analysisResult.spans.length} segment{analysisResult.spans.length !== 1 ? 's' : ''} flagged • Click to jump to timestamp
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-1">
+                  {analysisResult.spans.map((span, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSpanClick(span.start)}
+                      className="p-4 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/40 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono px-2 py-1 rounded bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-orange-100">
+                            {span.start} - {span.end}
+                          </span>
+                          <span className="text-xs px-2 py-1 rounded bg-orange-200 dark:bg-orange-800 text-orange-900 dark:text-orange-100">
+                            {Math.round(span.confidence * 100)}% confidence
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm font-medium text-orange-900 dark:text-orange-100 mb-2">
+                        "{span.text}"
+                      </p>
+                      <p className="text-xs text-muted-foreground italic">
+                        {span.rationale}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

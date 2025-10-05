@@ -298,9 +298,14 @@ export default function InteractiveTranscript({
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     <div className="space-y-2">
-                      <p className="font-semibold text-sm">
-                        Confidence: {Math.round(segment.span.confidence * 100)}%
-                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-sm">
+                          Confidence: {Math.round(segment.span.confidence * 100)}%
+                        </p>
+                        <p className="text-xs font-mono text-muted-foreground">
+                          {segment.span.start} - {segment.span.end}
+                        </p>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {segment.span.rationale}
                       </p>
