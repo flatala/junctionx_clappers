@@ -1,31 +1,13 @@
 # Backend - FastAPI Application
 
-A minimal FastAPI template with MySQL database integration.
+Main PERUN backend, with MySQL database and Whisper integration.
 
 ## Features
 
 - FastAPI web framework
 - MySQL database with SQLAlchemy ORM
-- CRUD operations for User model
 - Docker Compose for easy database setup
 - Environment-based configuration
-
-## Project Structure
-
-```
-backend/
-├── app/
-│   ├── __init__.py
-│   ├── main.py          # FastAPI application and endpoints
-│   ├── database.py      # Database configuration
-│   ├── models.py        # SQLAlchemy models
-│   ├── schemas.py       # Pydantic schemas
-│   └── test_user.py     # User endpoints
-├── .env.example         # Example environment variables
-├── docker-compose.yml   # Docker Compose configuration
-├── requirements.txt     # Python dependencies
-└── README.md
-```
 
 ## Setup
 
@@ -68,17 +50,6 @@ This will create a MySQL database with the following credentials:
 - Password: `password`
 - Port: `3306`
 
-#### Manual MySQL Setup
-
-If you have MySQL installed locally, create a database:
-```sql
-CREATE DATABASE junctionx_db;
-CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON junctionx_db.* TO 'user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-Update your `.env` file accordingly.
 
 ## Running the Application
 
@@ -95,13 +66,8 @@ Once the server is running, visit:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-## API Endpoints
+### API Endpoints
 
-### Health Check
-- `GET /` - Root endpoint
-- `GET /health` - Health check
-
-### Users
 - `POST /users` - Create a new user
 - `GET /users` - Get all users (with pagination)
 - `GET /users/{user_id}` - Get a specific user
