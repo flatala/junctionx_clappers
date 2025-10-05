@@ -5,6 +5,7 @@ from app.database import engine, Base
 from app.test_user import router as user_router
 from app.upload_api import router as upload_router
 from app.retrieve import router as retrieve_router
+from app.cleaning import router as cleaning_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(router=user_router, prefix="/users", tags=["Users"])
 app.include_router(router=upload_router, prefix="/upload", tags=["Upload"])
 app.include_router(router=retrieve_router, tags=["Retrieve"])
+app.include_router(router=cleaning_router, prefix="/clean", tags=["Cleaning"])
 
 
 @app.get("/")

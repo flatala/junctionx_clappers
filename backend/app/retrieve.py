@@ -1,16 +1,41 @@
-from fastapi import APIRouter, HTTPException, Depends
+from typing import Tuple
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Batch, Job
-from app.schemas import BatchResponse, JobAnalysisResult, AnalysisSpan, JobInfo
+from app.schemas import BatchResponse, JobAnalysisResult, AnalysisSpan, JobInfo, Optional, List
 import os
+import tempfile
+import asyncio
+import zipfile
 import mimetypes
 import json
 from pathlib import Path
 
 router = APIRouter()
+PROCESSED_ROOT = Path("processed")
 
+@router.get("/all_batches", response_model=list[BatchResponse])
+async def get_all_batches(db: Session = Depends(get_db)):
+    """Get all batches with their jobs"""
+    batches = db.query(Batch).all()
+    response = []
+    for batch in batches:
+        jobs = []
+        for job in batch.jobs:
+            jobs.append(JobInfo(
+                job_id=job.id,
+                filename=job.original_filename or f"job_{job.id}",
+                status=job.status
+            ))
+        response.append(BatchResponse(
+            name=batch.name,
+            batch_id=batch.id,
+            description=batch.description,
+            jobs=jobs,
+        ))
+    return response
 
 @router.get("/file/{job_id}")
 async def retrieve_file(job_id: str):
@@ -104,6 +129,7 @@ async def get_batch(batch_id: str, db: Session = Depends(get_db)):
     return BatchResponse(
         name=batch.name,
         description=batch.description,
+        batch_id=batch.id,
         jobs=jobs
     )
 
@@ -182,3 +208,82 @@ async def get_job_file(batch_id: str, job_id: str, db: Session = Depends(get_db)
         filename=job.original_filename or Path(job.original_file_path).name
     )
 
+@router.post("/get_processed_spans")
+async def get_job_processed_spans(
+    batch_id: str,
+    job_id: Optional[str] = None,
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Get processed spans for a job or batch. Always returns a ZIP file.
+    If job_id is provided -> ZIP contains only that job's processed JSON.
+    If job_id omitted -> ZIP contains all processed JSONs in the batch.
+    """
+    def find_processed(original_path: str, batch_id: str) -> Optional[Path]:
+        p = Path(original_path)
+        stem_file = p.stem + "_processed_spans.json"
+        zip_dir = p.parent
+
+        # Prefer processed/<zip_extract_dir>/... when parent looks like batch_<batch_id>_zip_*
+        if zip_dir.name.startswith(f"batch_{batch_id}_zip_"):
+            cand = PROCESSED_ROOT / zip_dir.name / stem_file
+            if cand.exists():
+                return cand
+
+        # Fallback to processed/<stem>_processed_spans.json
+        cand = PROCESSED_ROOT / stem_file
+        return cand if cand.exists() else None
+
+    print(f"[DEBUG] batch_id: {batch_id}, job_id: {job_id}")
+
+    # ---- collect processed files ----
+    if job_id:
+        job = db.query(Job).filter(Job.id == job_id, Job.batch_id == batch_id).one_or_none()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if not job.original_file_path:
+            raise HTTPException(status_code=404, detail="Original file path not found")
+
+        proc = find_processed(job.original_file_path, job.batch_id)
+        if not proc:
+            raise HTTPException(status_code=404, detail="Processed spans file not found")
+
+        found = [(proc, f"{job.id}_{proc.name}")]
+
+    else:
+        jobs = db.query(Job).filter(Job.batch_id == batch_id).all()
+        print("Jobs in batch:", len(jobs))
+        if not jobs:
+            raise HTTPException(status_code=404, detail="Batch not found or no jobs in batch")
+
+        found: List[Tuple[Path, str]] = []
+        for job in jobs:
+            if not job.original_file_path:
+                continue
+            p = find_processed(job.original_file_path, job.batch_id)
+            if p:
+                found.append((p, f"{job.id}_{p.name}"))
+
+        if not found:
+            raise HTTPException(status_code=404, detail="No processed spans JSON files found for this batch")
+
+    # ---- write ZIP ----
+    tmp = tempfile.NamedTemporaryFile(suffix=f"_batch_{batch_id}_processed_spans.zip", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
+    def write_zip(zip_path: str, items: List[Tuple[Path, str]]):
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for p, arc in items:
+                zf.write(p, arcname=arc)
+        return zip_path
+
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, write_zip, tmp_path, found)
+
+    # cleanup after response
+    background_tasks.add_task(lambda p=tmp_path: os.unlink(p) if os.path.exists(p) else None)
+
+    friendly_name = f"{'job' if job_id else 'batch'}_{batch_id}_processed_spans.zip"
+    return FileResponse(path=tmp_path, media_type="application/zip", filename=friendly_name)

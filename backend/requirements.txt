@@ -10,6 +10,8 @@ email-validator==2.2.0
 faster-whisper
 python-multipart
 ffmpeg-python==0.2.0
+numpy==1.24.3
 pydub==0.25.1
+moviepy
 librosa
 soundfile
