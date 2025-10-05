@@ -58,7 +58,7 @@ async def upload_batch(
     custom_definitions: str = Form("[]"),
     negative_examples: str = Form("[]"),
     files: List[UploadFile] = File(...),
-    patch_duration_sec: int = Form(120),
+    patch_duration_sec: int = Form(1800),
     overlap_sec: int = Form(30),
     db: Session = Depends(get_db)
 ):

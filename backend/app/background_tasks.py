@@ -169,8 +169,6 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
         json.dump(final_result, f, indent=4)
 
     # Save final result to file
-    
-
 
     job = db.get(Job, job_id)
     job.status = "completed"
