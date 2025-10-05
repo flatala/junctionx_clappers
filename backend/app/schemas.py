@@ -43,7 +43,6 @@ class JobInfo(BaseModel):
 class BatchResponse(BaseModel):
     """Schema for batch response"""
     name: str
-    batch_id: str  # Added batch_id field
     description: Optional[str] = None
     jobs: List[JobInfo]
 
