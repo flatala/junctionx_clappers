@@ -9,6 +9,7 @@ import json
 from typing import List, Optional
 from app.models import Job, Batch
 from app.background_tasks import main_background_function
+import asyncio
 
 router = routing.APIRouter()
 
@@ -51,7 +52,7 @@ def extract_audio_from_zip(zip_file: UploadFile, extract_dir: Path) -> List[Path
 
 @router.post("")
 async def upload_batch(
-    background_tasks: BackgroundTasks,
+    # background_tasks: BackgroundTasks,
     name: str = Form(...),
     description: Optional[str] = Form(None),
     default_definitions: str = Form("[]"),
@@ -141,16 +142,17 @@ async def upload_batch(
         db.refresh(job)
         
         # Launch background task for each job
-        background_tasks.add_task(
-            main_background_function,
-            str(job.id),
-            str(file_path),
-            patch_duration_sec,
-            overlap_sec,
-            db,
-            default_defs_list,
-            positive_examples_list,
-            negative_examples_list
+        asyncio.create_task(
+            main_background_function(
+                str(job.id),
+                str(file_path),
+                patch_duration_sec,
+                overlap_sec,
+                db,
+                default_defs_list,
+                positive_examples_list,
+                negative_examples_list
+            )
         )
     
     return {"batch_id": batch.id}

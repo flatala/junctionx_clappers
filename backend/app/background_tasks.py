@@ -9,8 +9,10 @@ from app.models import Job
 import requests
 import string
 import json
+import httpx
 
 MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
+
 
 def load_whisper():
     preferred = os.getenv("WHISPER_DEVICE")  # cuda | metal | cpu (optional)
@@ -39,10 +41,11 @@ def load_whisper():
 
     raise RuntimeError(f"Whisper init failed. Last error: {last_err}")
 
+
 whisper_model = load_whisper()
 
 
-def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
+async def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
     # Import db session inside background task
     with tempfile.TemporaryDirectory() as tmpdir:
         # Work on a copy
@@ -57,29 +60,31 @@ def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
             audio_path = working_path
 
         # Split audio
-        patches = split_audio_to_patches(str(audio_path), patch_duration_sec, overlap_sec)
+        patches = await split_audio_to_patches(str(audio_path), patch_duration_sec, overlap_sec)
 
         # Transcribe
-        all_results = transcribe_patches(patches, whisper_model)
+        all_results = await transcribe_patches(patches, whisper_model)
 
         return all_results
 
 
-def send_to_llm(transcribed_text: str, default_definitions: list = None, positive_examples: list = None, negative_examples: list = None):
+async def send_to_llm(transcribed_text: str, default_definitions: list = None, positive_examples: list = None, negative_examples: list = None):
     """Send transcribed text to LLM for analysis"""
-    response = requests.post(
-        "http://localhost:8001/detect",
-        json={
-            "transcription": transcribed_text,
-            "default_definitions": default_definitions or [],
-            "positive_examples": positive_examples or [],
-            "negative_examples": negative_examples or []
-        }
-    )
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8001/detect",
+            json={
+                "transcription": transcribed_text,
+                "default_definitions": default_definitions or [],
+                "positive_examples": positive_examples or [],
+                "negative_examples": negative_examples or []
+            },
+            timeout=1800
+        )
 
-    result = response.json()
+        result = response.json()
 
-    return result
+        return result
 
 
 def normalize_word(word):
@@ -118,17 +123,15 @@ def find_matching_spans(transcribed_patches: dict, llm_spans: list):
     return processed_spans
 
 
-def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session, default_definitions: list = None, positive_examples: list = None, negative_examples: list = None):
-
+async def main_background_function(job_id: str, original_path: str, patch_duration_sec: int, overlap_sec: int, db: Session, default_definitions: list = None, positive_examples: list = None, negative_examples: list = None):
     job = db.get(Job, job_id)
     job.status = "transcribing"
     db.commit()
     db.expire_all()
 
-    transcribed_patches = process_file(original_path, patch_duration_sec, overlap_sec)
+    transcribed_patches = await process_file(original_path, patch_duration_sec, overlap_sec)
 
     print(f"Got {len(transcribed_patches)} batches")
-
     
     cleaned_list = []
 
@@ -149,11 +152,10 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     
     for i, batch in enumerate(cleaned_list):
         print(f"Evaluating {i + 1}/{len(transcribed_patches)} ")
-        result_from_llm = send_to_llm(batch, default_definitions, positive_examples, negative_examples)
+        result_from_llm = await send_to_llm(batch, default_definitions, positive_examples, negative_examples)
         llm_spans = result_from_llm["spans"]
         processed_spans = find_matching_spans(transcribed_patches[i], llm_spans)
         all_processed_spans.extend(processed_spans)
-        
 
     # Read the final transcribed text from file
     with open(Path(original_path).with_suffix('.txt'), 'r', encoding='utf-8') as f:
