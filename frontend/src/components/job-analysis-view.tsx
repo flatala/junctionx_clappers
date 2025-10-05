@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api, type JobAnalysisResult } from '@/lib/api';
+import { api, type JobAnalysisResult, type UserFeedbackResponse } from '@/lib/api';
 import TranscriptView, { type TranscriptSegment } from './transcript-view';
 import SummaryPanel from './summary-panel';
 import ErrorAlert from './error-alert';
@@ -11,6 +11,7 @@ import { useExport } from '@/hooks/use-export';
 import type { FlagType } from './flag-icon';
 import InteractiveTranscript from './interactive-transcript';
 import type { ConfidenceMediaPlayerRef } from './confidence-media-player';
+import { useToast } from '@/hooks/use-toast';
 
 // Helper function to parse time string to seconds
 const parseTimeToSeconds = (timeStr: string): number => {
@@ -57,12 +58,14 @@ const convertToTranscriptSegments = (analysisResult: JobAnalysisResult): Transcr
 export default function JobAnalysisView() {
   const { batchId, jobId } = useParams<{ batchId: string; jobId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [analysisResult, setAnalysisResult] = useState<JobAnalysisResult | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioPlayerRef = useRef<ConfidenceMediaPlayerRef>(null);
+  const [userFeedback, setUserFeedback] = useState<UserFeedbackResponse[]>([]);
 
   // Convert analysis result to transcript segments
   const transcriptSegments = analysisResult ? convertToTranscriptSegments(analysisResult) : [];
@@ -75,6 +78,7 @@ export default function JobAnalysisView() {
   useEffect(() => {
     if (batchId && jobId) {
       loadJobAnalysis();
+      loadUserFeedback();
     }
   }, [batchId, jobId]);
 
@@ -108,6 +112,73 @@ export default function JobAnalysisView() {
       setError(error instanceof Error ? error.message : 'Failed to load audio file');
     } finally {
       setIsLoadingAudio(false);
+    }
+  };
+
+  const loadUserFeedback = async () => {
+    if (!jobId) return;
+    
+    try {
+      const feedback = await api.getJobFeedback(jobId);
+      setUserFeedback(feedback);
+    } catch (error) {
+      console.error('Failed to load user feedback:', error);
+    }
+  };
+
+  const handleMarkAsExtremist = async (text: string, originalConfidence?: number) => {
+    if (!batchId || !jobId) return;
+    
+    try {
+      await api.createFeedback({
+        job_id: jobId,
+        batch_id: batchId,
+        text,
+        feedback_type: 'positive', // positive = marked as extremist (negative example)
+        original_confidence: originalConfidence,
+      });
+      
+      toast({
+        title: "Marked as extremist",
+        description: "This phrase will be used as a negative example for future analysis.",
+      });
+      
+      // Reload feedback
+      await loadUserFeedback();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to save feedback',
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkAsNormal = async (text: string, originalConfidence?: number) => {
+    if (!batchId || !jobId) return;
+    
+    try {
+      await api.createFeedback({
+        job_id: jobId,
+        batch_id: batchId,
+        text,
+        feedback_type: 'negative', // negative = marked as normal (positive example)
+        original_confidence: originalConfidence,
+      });
+      
+      toast({
+        title: "Marked as normal",
+        description: "This phrase will be used as a positive example for future analysis.",
+      });
+      
+      // Reload feedback
+      await loadUserFeedback();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to save feedback',
+        variant: "destructive",
+      });
     }
   };
 
@@ -208,9 +279,9 @@ export default function JobAnalysisView() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Full Transcript</CardTitle>
-              <CardDescription>
-                Click on highlighted text to jump to that moment in the audio
-              </CardDescription>
+                <CardDescription>
+                Click highlighted text to jump to audio • Select text to mark as extremist or normal content
+                </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="prose max-w-none">
@@ -218,6 +289,9 @@ export default function JobAnalysisView() {
                   transcriptText={analysisResult.transcript_text}
                   spans={analysisResult.spans}
                   onSpanClick={handleSpanClick}
+                  onMarkAsExtremist={handleMarkAsExtremist}
+                  onMarkAsNormal={handleMarkAsNormal}
+                  userFeedback={userFeedback}
                 />
               </div>
             </CardContent>

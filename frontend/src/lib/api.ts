@@ -109,6 +109,72 @@ export const api = {
     }
 
     return response.json();
+  },
+
+  // Create user feedback
+  async createFeedback(feedback: UserFeedbackCreate): Promise<UserFeedbackResponse> {
+    const response = await fetch(`${API_BASE_URL}/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(feedback),
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to create feedback: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    return response.json();
+  },
+
+  // Get batch feedback summary
+  async getBatchFeedbackSummary(batchId: string): Promise<BatchFeedbackSummary> {
+    const response = await fetch(`${API_BASE_URL}/feedback/batch/${batchId}/summary`);
+    
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to fetch feedback summary: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    return response.json();
+  },
+
+  // Get job feedback
+  async getJobFeedback(jobId: string): Promise<UserFeedbackResponse[]> {
+    const response = await fetch(`${API_BASE_URL}/feedback/job/${jobId}`);
+    
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to fetch job feedback: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
+
+    return response.json();
+  },
+
+  // Delete feedback
+  async deleteFeedback(feedbackId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/feedback/${feedbackId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        `Failed to delete feedback: ${response.statusText}`,
+        response.status,
+        response.statusText
+      );
+    }
   }
 };
 
@@ -143,7 +209,7 @@ export interface AnalysisSpan {
 export interface JobStatus {
   job_id: string;
   name: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'analysing' | 'completed' | 'failed';
 }
 
 // Legacy type definitions for backward compatibility
@@ -164,4 +230,28 @@ export interface WhisperSegment {
   avg_logprob: number;
   compression_ratio: number;
   no_speech_prob: number;
+}
+
+// User feedback types
+export interface UserFeedbackCreate {
+  job_id: string;
+  batch_id: string;
+  text: string;
+  feedback_type: 'positive' | 'negative'; // positive = marked as extremist, negative = unmarked as normal
+  original_confidence?: number;
+}
+
+export interface UserFeedbackResponse {
+  id: string;
+  job_id: string;
+  batch_id: string;
+  text: string;
+  feedback_type: 'positive' | 'negative';
+  original_confidence?: number;
+  created_at: string;
+}
+
+export interface BatchFeedbackSummary {
+  positive_examples: string[];  // Unmarked as normal
+  negative_examples: string[];  // Marked as extremist
 }

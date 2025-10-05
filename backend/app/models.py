@@ -90,6 +90,9 @@ class Job(Base):
     # Relationship to batch
     batch = relationship("Batch", back_populates="jobs")
     
+    # Relationship to user feedback
+    user_feedback = relationship("UserFeedback", back_populates="job", cascade="all, delete-orphan")
+    
     def get_analysis_result_dict(self):
         """Parse analysis_result JSON string to dict"""
         if self.analysis_result:
@@ -105,4 +108,25 @@ class Job(Base):
             self.analysis_result = json.dumps(data)
         else:
             self.analysis_result = None
+
+
+class UserFeedback(Base):
+    """User feedback model for human-in-the-loop learning"""
+    __tablename__ = "user_feedback"
+
+    id = Column(String(length=36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id = Column(String(36), ForeignKey("jobs.id"), nullable=False)
+    batch_id = Column(String(36), ForeignKey("batches.id"), nullable=False)
+    text = Column(Text, nullable=False)  # The marked/unmarked text
+    feedback_type = Column(String(50), nullable=False)  # "positive" (marked as extremist) or "negative" (unmarked/normal)
+    original_confidence = Column(Integer, nullable=True)  # Original confidence score if it was already flagged
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    job = relationship("Job", back_populates="user_feedback")
+    batch = relationship("Batch", back_populates="user_feedback")
+
+
+# Update Batch model to include user_feedback relationship
+Batch.user_feedback = relationship("UserFeedback", back_populates="batch", cascade="all, delete-orphan")
 

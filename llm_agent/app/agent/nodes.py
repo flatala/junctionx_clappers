@@ -225,6 +225,31 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
     negative_examples = "\n".join(f"- {n}" for n in state.negative_examples) if state.negative_examples else "None provided"
 
     logger.info(f"→ BATCH: Processing {len(state.transcription_segments)} segments in parallel")
+    
+    # Print detailed information about criteria and examples
+    logger.info("=" * 80)
+    logger.info("CRITERIA AND EXAMPLES BEING SENT TO LLM:")
+    logger.info("=" * 80)
+    logger.info(f"\n📋 DEFAULT DEFINITIONS ({len(state.default_definitions)}):")
+    for i, criterion in enumerate(state.default_definitions, 1):
+        logger.info(f"   {i}. {criterion}")
+    
+    logger.info(f"\n🎯 CUSTOM DEFINITIONS ({len(state.custom_definitions)}):")
+    if state.custom_definitions:
+        for i, criterion in enumerate(state.custom_definitions, 1):
+            logger.info(f"   {i}. {criterion}")
+    else:
+        logger.info("   (none)")
+    
+    logger.info(f"\n✅ NEGATIVE EXAMPLES ({len(state.negative_examples)}):")
+    if state.negative_examples:
+        for i, example in enumerate(state.negative_examples, 1):
+            logger.info(f"   {i}. {example}")
+    else:
+        logger.info("   (none)")
+    
+    logger.info(f"\n📊 TOTAL CRITERIA: {len(all_criteria)} (default + custom)")
+    logger.info("=" * 80)
 
     try:
         # Build messages for each segment
@@ -239,6 +264,26 @@ async def content_check_node(state: AgentState, *, config: Optional[RunnableConf
             ]
             for seg in state.transcription_segments
         ]
+        
+        # Print the complete prompt for the first segment
+        if all_messages:
+            logger.info("\n" + "=" * 80)
+            logger.info("COMPLETE PROMPT SENT TO LLM (FIRST SEGMENT):")
+            logger.info("=" * 80)
+            logger.info("\n🔧 SYSTEM PROMPT:")
+            logger.info("-" * 80)
+            logger.info(cfg.system_prompt)
+            logger.info("-" * 80)
+            logger.info("\n💬 HUMAN PROMPT:")
+            logger.info("-" * 80)
+            formatted_prompt = cfg.human_prompt.format(
+                transcription=state.transcription_segments[0],
+                extremism_criteria=extremism_criteria,
+                negative_examples=negative_examples
+            )
+            logger.info(formatted_prompt)
+            logger.info("-" * 80)
+            logger.info("=" * 80 + "\n")
 
         # Batch process all segments in parallel
         responses = await get_llm().abatch(all_messages)
