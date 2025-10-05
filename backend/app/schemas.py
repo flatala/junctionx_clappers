@@ -26,7 +26,7 @@ class BatchCreate(BaseModel):
     name: str
     description: Optional[str] = None
     default_definitions: List[str] = []
-    custom_definitions: List[str] = []
+    positive_examples: List[str] = []
     negative_examples: List[str] = []
 
 

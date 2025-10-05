@@ -35,12 +35,15 @@ CONSTRAINTS:
 - Do not include explanations or extra fields.
 """
 
-HUMAN_PROMPT = """Task: Detect extremist spans in the transcript below using ONLY the user-defined criteria.
+HUMAN_PROMPT = """Task: Detect extremist spans in the transcript below using the criteria and reference examples.
 
-USER-DEFINED EXTREMISM CRITERIA (flag content matching these):
+EXTREMISM CRITERIA (abstract rules to detect):
 {extremism_criteria}
 
-NEGATIVE EXAMPLES (do NOT flag these types of content):
+POSITIVE EXAMPLES (examples of extremist content TO flag - use these to guide your judgment):
+{positive_examples}
+
+NEGATIVE EXAMPLES (examples of normal content NOT to flag - use these to avoid false positives):
 {negative_examples}
 
 Transcript (analyze exactly as given):
@@ -59,8 +62,8 @@ Return ONLY this JSON schema:
 }}
 
 Constraints:
-- Use ONLY the criteria provided above - do not apply any other definitions
-- If no extremist content matches the criteria: {{"spans": []}}
+- Use the criteria and reference examples to guide your judgment
+- If no extremist content matches: {{"spans": []}}
 - Keep spans minimal (no extra context)
 - Confidence: 0.0-1.0 (higher = more certain it matches the criteria)
 - Return ONLY valid JSON, no other text
