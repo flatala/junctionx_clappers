@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Upload, Trash2, X } from 'lucide-react';
+import { Plus, Upload, Trash2, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { api, type BatchDetails } from '@/lib/api';
+import { api, type BatchDetails, type BatchFeedbackSummary } from '@/lib/api';
 import { storage } from '@/lib/storage';
 import { DEFAULT_EXTREMISM_DEFINITIONS } from '@/lib/extremism-definitions';
 import BatchFileUploader from './batch-file-uploader';
@@ -14,6 +14,7 @@ import EmptyState from './empty-state';
 
 export default function BatchListView() {
   const [batches, setBatches] = useState<(BatchDetails & { id: string })[]>([]);
+  const [batchFeedback, setBatchFeedback] = useState<Map<string, BatchFeedbackSummary>>(new Map());
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -48,7 +49,20 @@ export default function BatchListView() {
       });
       
       const loadedBatches = await Promise.all(batchPromises);
-      setBatches(loadedBatches.filter((batch): batch is BatchDetails & { id: string } => batch !== null));
+      const validBatches = loadedBatches.filter((batch): batch is BatchDetails & { id: string } => batch !== null);
+      setBatches(validBatches);
+      
+      // Load feedback for each batch
+      const feedbackMap = new Map<string, BatchFeedbackSummary>();
+      for (const batch of validBatches) {
+        try {
+          const feedback = await api.getBatchFeedbackSummary(batch.id);
+          feedbackMap.set(batch.id, feedback);
+        } catch (error) {
+          console.error(`Failed to load feedback for batch ${batch.id}:`, error);
+        }
+      }
+      setBatchFeedback(feedbackMap);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load batches');
     } finally {
@@ -64,11 +78,31 @@ export default function BatchListView() {
 
     setIsUploading(true);
     try {
-      // Filter out empty strings from custom definitions and negative examples
+      // Collect all user feedback as custom definitions and negative examples
+      const allPositiveExamples = new Set<string>();
+      const allNegativeExamples = new Set<string>();
+      
+      batchFeedback.forEach((feedback) => {
+        feedback.positive_examples.forEach(ex => allPositiveExamples.add(ex));
+        feedback.negative_examples.forEach(ex => allNegativeExamples.add(ex));
+      });
+      
+      // Merge with form data
+      const customDefsList = [
+        ...formData.customDefinitions.filter(d => d.trim() !== ''),
+        ...Array.from(allNegativeExamples) // User marked as extremist
+      ];
+      
+      const negativeExList = [
+        ...formData.negativeExamples.filter(e => e.trim() !== ''),
+        ...Array.from(allPositiveExamples) // User marked as normal
+      ];
+      
+      // Filter out empty strings and duplicates
       const result = await api.uploadBatch({
         ...formData,
-        customDefinitions: formData.customDefinitions.filter(d => d.trim() !== ''),
-        negativeExamples: formData.negativeExamples.filter(e => e.trim() !== '')
+        customDefinitions: Array.from(new Set(customDefsList)),
+        negativeExamples: Array.from(new Set(negativeExList))
       });
       storage.addBatchId(result.batch_id);
 
@@ -136,6 +170,74 @@ export default function BatchListView() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Show user feedback will be used */}
+            {Array.from(batchFeedback.values()).some(f => f.positive_examples.length > 0 || f.negative_examples.length > 0) && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-1">
+                      Human Feedback Will Be Applied
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                      This batch will automatically use feedback from previous batches to improve accuracy:
+                    </p>
+                    
+                    {/* Collect all feedback */}
+                    {(() => {
+                      const allPositiveExamples = new Set<string>();
+                      const allNegativeExamples = new Set<string>();
+                      
+                      batchFeedback.forEach((feedback) => {
+                        feedback.positive_examples.forEach(ex => allPositiveExamples.add(ex));
+                        feedback.negative_examples.forEach(ex => allNegativeExamples.add(ex));
+                      });
+                      
+                      return (
+                        <div className="space-y-3">
+                          {allNegativeExamples.size > 0 && (
+                            <div className="border-l-2 border-orange-500 pl-3">
+                              <div className="flex items-center gap-1 mb-2">
+                                <AlertTriangle className="w-4 h-4 text-orange-600" />
+                                <span className="text-xs font-semibold text-orange-900 dark:text-orange-100">
+                                  {allNegativeExamples.size} phrase{allNegativeExamples.size !== 1 ? 's' : ''} will be added as Custom Definitions (positive examples):
+                                </span>
+                              </div>
+                              <div className="space-y-1 max-h-40 overflow-y-auto">
+                                {Array.from(allNegativeExamples).map((phrase, idx) => (
+                                  <div key={idx} className="text-xs bg-orange-100 dark:bg-orange-900/20 text-orange-900 dark:text-orange-100 px-2 py-1 rounded">
+                                    "{phrase}"
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {allPositiveExamples.size > 0 && (
+                            <div className="border-l-2 border-green-500 pl-3">
+                              <div className="flex items-center gap-1 mb-2">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-xs font-semibold text-green-900 dark:text-green-100">
+                                  {allPositiveExamples.size} phrase{allPositiveExamples.size !== 1 ? 's' : ''} will be added as Negative Examples (false positives):
+                                </span>
+                              </div>
+                              <div className="space-y-1 max-h-40 overflow-y-auto">
+                                {Array.from(allPositiveExamples).map((phrase, idx) => (
+                                  <div key={idx} className="text-xs bg-green-100 dark:bg-green-900/20 text-green-900 dark:text-green-100 px-2 py-1 rounded">
+                                    "{phrase}"
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div>
               <label htmlFor="name" className="block text-sm font-medium mb-2">
                 Batch Name *
@@ -337,40 +439,76 @@ export default function BatchListView() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {batches.map((batch) => (
-            <Card key={batch.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{batch.name}</CardTitle>
-                    <CardDescription className="text-sm">
-                      {batch.jobs.length} file{batch.jobs.length !== 1 ? 's' : ''}
-                    </CardDescription>
+          {batches.map((batch) => {
+            const feedback = batchFeedback.get(batch.id);
+            const hasUserFeedback = feedback && (feedback.positive_examples.length > 0 || feedback.negative_examples.length > 0);
+            
+            return (
+              <Card key={batch.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">{batch.name}</CardTitle>
+                      <CardDescription className="text-sm">
+                        {batch.jobs.length} file{batch.jobs.length !== 1 ? 's' : ''}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteBatch(batch.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteBatch(batch.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {batch.description && (
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {batch.description}
-                  </p>
-                )}
-                <Link to={`/${batch.id}`}>
-                  <Button className="w-full">
-                    View Batch
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                  {batch.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {batch.description}
+                    </p>
+                  )}
+                  
+                  {hasUserFeedback && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">
+                        Human Feedback
+                      </p>
+                      {feedback.positive_examples.length > 0 && (
+                        <div className="flex items-start gap-2 text-xs">
+                          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-medium text-green-600">
+                              {feedback.positive_examples.length} phrase{feedback.positive_examples.length !== 1 ? 's' : ''}
+                            </span>
+                            <span className="text-muted-foreground"> marked as normal</span>
+                          </div>
+                        </div>
+                      )}
+                      {feedback.negative_examples.length > 0 && (
+                        <div className="flex items-start gap-2 text-xs">
+                          <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-medium text-orange-600">
+                              {feedback.negative_examples.length} phrase{feedback.negative_examples.length !== 1 ? 's' : ''}
+                            </span>
+                            <span className="text-muted-foreground"> marked as extremist</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <Link to={`/${batch.id}`}>
+                    <Button className="w-full">
+                      View Batch
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

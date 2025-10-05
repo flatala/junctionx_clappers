@@ -41,7 +41,7 @@ export default function BatchDetailsView() {
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'failed':
         return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'processing':
+      case 'analysing':
         return <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />;
       default:
         return <Clock className="w-4 h-4 text-yellow-500" />;
@@ -54,7 +54,7 @@ export default function BatchDetailsView() {
         return <Badge variant="default" className="bg-green-500">Completed</Badge>;
       case 'failed':
         return <Badge variant="destructive">Failed</Badge>;
-      case 'processing':
+      case 'analysing':
         return <Badge variant="secondary">Processing</Badge>;
       default:
         return <Badge variant="outline">Pending</Badge>;

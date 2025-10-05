@@ -84,6 +84,33 @@ async def detect_extremist_content(request: DetectionRequest):
     """Detect extremist content in transcribed text."""
     total_criteria = len(request.default_definitions) + len(request.custom_definitions)
     logger.info(f"→ REQUEST: {len(request.transcription)} chars, {total_criteria} criteria ({len(request.default_definitions)} default, {len(request.custom_definitions)} custom), {len(request.negative_examples)} negative examples")
+    
+    # Log detailed request information
+    logger.info("\n" + "=" * 80)
+    logger.info("INCOMING REQUEST TO /detect ENDPOINT:")
+    logger.info("=" * 80)
+    logger.info(f"\n📝 TRANSCRIPTION LENGTH: {len(request.transcription)} characters")
+    logger.info(f"First 200 chars: {request.transcription[:200]}...")
+    
+    logger.info(f"\n📋 DEFAULT DEFINITIONS ({len(request.default_definitions)}):")
+    for i, definition in enumerate(request.default_definitions, 1):
+        logger.info(f"   {i}. {definition}")
+    
+    logger.info(f"\n🎯 CUSTOM DEFINITIONS ({len(request.custom_definitions)}):")
+    if request.custom_definitions:
+        for i, definition in enumerate(request.custom_definitions, 1):
+            logger.info(f"   {i}. {definition}")
+    else:
+        logger.info("   (none - no user feedback)")
+    
+    logger.info(f"\n✅ NEGATIVE EXAMPLES ({len(request.negative_examples)}):")
+    if request.negative_examples:
+        for i, example in enumerate(request.negative_examples, 1):
+            logger.info(f"   {i}. {example}")
+    else:
+        logger.info("   (none - no user corrections)")
+    
+    logger.info("=" * 80 + "\n")
 
     if llm_instance is None:
         raise HTTPException(status_code=503, detail="Model not loaded")

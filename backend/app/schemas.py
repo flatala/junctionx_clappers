@@ -77,3 +77,35 @@ class JobStatus(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserFeedbackCreate(BaseModel):
+    """Schema for creating user feedback"""
+    job_id: str
+    batch_id: str
+    text: str
+    feedback_type: str  # "positive" (newly marked as extremist) or "negative" (unmarked as normal)
+    original_confidence: Optional[float] = None
+
+
+class UserFeedbackResponse(BaseModel):
+    """Schema for user feedback response"""
+    id: str
+    job_id: str
+    batch_id: str
+    text: str
+    feedback_type: str
+    original_confidence: Optional[float] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BatchFeedbackSummary(BaseModel):
+    """Schema for batch feedback summary"""
+    positive_examples: List[str]  # Newly marked as extremist
+    negative_examples: List[str]  # Unmarked as normal
+
+    class Config:
+        from_attributes = True
