@@ -67,7 +67,6 @@ def process_file(original_path: str, patch_duration_sec: int, overlap_sec: int):
 
 def send_to_llm(transcribed_text: str, default_definitions: list = None, custom_definitions: list = None, negative_examples: list = None):
     """Send transcribed text to LLM for analysis"""
-    print("SENDING TO LLM")
     response = requests.post(
         "http://localhost:8001/detect",
         json={
@@ -128,35 +127,50 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
 
     transcribed_patches = process_file(original_path, patch_duration_sec, overlap_sec)
 
-    print(transcribed_patches)
+    print(f"Got {len(transcribed_patches)} batches")
 
-    transcribed_text = transcribed_patches[0]["patch_text"].strip()
+    
+    cleaned_list = []
 
     # Save transcribed text to file
     txt_path = Path(original_path).with_suffix('.txt')
     with open(txt_path, 'w', encoding='utf-8') as f:
-        f.write(transcribed_text)
+        for transcribed_batch in transcribed_patches:
+            transcribed_text = transcribed_batch["patch_text"].strip()
+            cleaned_list.append(transcribed_text)
+            f.write(transcribed_text)
 
     job = db.get(Job, job_id)
     job.status = "analysing"
     db.commit()
     db.expire_all()
 
-    result_from_llm = send_to_llm(transcribed_text, default_definitions, custom_definitions, negative_examples)
+    all_processed_spans = []
+    
+    for i, batch in enumerate(cleaned_list):
+        print(f"Evaluating {i + 1}/{len(transcribed_patches)} ")
+        result_from_llm = send_to_llm(batch, default_definitions, custom_definitions, negative_examples)
+        llm_spans = result_from_llm["spans"]
+        processed_spans = find_matching_spans(transcribed_patches[i], llm_spans)
+        all_processed_spans.extend(processed_spans)
+        
 
-    print(result_from_llm)
+    # Read the final transcribed text from file
+    with open(Path(original_path).with_suffix('.txt'), 'r', encoding='utf-8') as f:
+        transcribed_text = f.read()
 
-    llm_spans = result_from_llm["spans"]
-    processed_spans = find_matching_spans(transcribed_patches[0], llm_spans)
+    # Read the JSON dumps
+    print("Done!")
 
-    final_result = {"transcript_text": transcribed_text, "spans": processed_spans}
+    final_result = {"transcript_text": transcribed_text, "spans": all_processed_spans}
 
-    # Save final result to file
     txt_path = Path(original_path).with_suffix('.json')
     with open(txt_path, 'w', encoding='utf-8') as f:
         json.dump(final_result, f, indent=4)
 
-    print(processed_spans)
+    # Save final result to file
+    
+
 
     job = db.get(Job, job_id)
     job.status = "completed"

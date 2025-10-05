@@ -1,6 +1,6 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from .agent_state import AgentState
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from .config import AgentConfiguration as Configuration
 from langchain_core.runnables import RunnableConfig
 from .utils import get_llm
@@ -10,7 +10,14 @@ import re
 
 logger = logging.getLogger(__name__)
 
-_SENTENCE_RE = re.compile(r'.+?(?:[\.!\?;:](?=\s|$)|$)', re.DOTALL)
+# _SENTENCE_RE = re.compile(r'.+?(?:[\.!\?;:](?=\s|$)|$)', re.DOTALL)
+_SENTENCE_RE = re.compile(
+    r"""
+    (?:[^.!?;"]+?|"(?:[^"]+)"|\([^)]+\)|\[[^\]]+\])+?
+    (?:[.!?;]+(?=\s|$)|$)                                 
+    """,
+    re.VERBOSE | re.UNICODE
+)
 
 async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig] = None) -> dict:
     """Refine user-provided custom criteria using LLM (for future use)."""
@@ -32,76 +39,175 @@ async def refine_criteria(state: AgentState, *, config: Optional[RunnableConfig]
         return {"refined_criteria": state.custom_definitions}
 
 def _sentences(text: str) -> List[str]:
-    return [m.group(0).strip() for m in _SENTENCE_RE.finditer(text) if m.group(0).strip()]
+    """Regex-based sentence splitter; trims empties."""
+    return [m.group(0).strip() for m in _SENTENCE_RE.finditer(text or "") if m.group(0).strip()]
+
+def _ws_split_prefix(s: str, limit: int) -> Optional[Tuple[str, str]]:
+    """
+    Longest prefix of s with length <= limit that ends on whitespace.
+    Returns (head, tail) or None if no whitespace boundary within limit.
+    """
+    s = s.rstrip()
+    if len(s) <= limit:
+        return s, ""
+    window = s[:limit + 1]
+    i = max((j for j, ch in enumerate(window) if ch.isspace()), default=-1)
+    if i <= 0:
+        return None
+    return s[:i].rstrip(), s[i+1:].lstrip()
 
 def _split_overlong(s: str, max_len: int) -> List[str]:
-    """Split a single overlong segment into <= max_len chunks (prefer word boundaries)."""
-    if len(s) <= max_len:
-        return [s]
-    parts, cur = [], ""
-    for word in s.split():
-        sep = "" if not cur else " "
-        if len(cur) + len(sep) + len(word) <= max_len:
-            cur += sep + word
+    """
+    Split s into <= max_len chunks, preferring whitespace; last resort: hard cuts.
+    """
+    s = s.strip()
+    if not s:
+        return []
+    out: List[str] = []
+    cur = s
+    while cur:
+        if len(cur) <= max_len:
+            out.append(cur)
+            break
+        ws = _ws_split_prefix(cur, max_len)
+        if ws:
+            head, tail = ws
+            out.append(head)
+            cur = tail
         else:
-            if cur:
-                parts.append(cur)
-                cur = ""
-            # word itself may be longer than max_len -> hard-cut
-            if len(word) > max_len:
-                start = 0
-                while start < len(word):
-                    parts.append(word[start:start+max_len])
-                    start += max_len
-            else:
-                cur = word
-    if cur:
-        parts.append(cur)
-    return parts
+            # hard cut
+            out.append(cur[:max_len])
+            cur = cur[max_len:].lstrip()
+    return out
 
-def _merge(sentences: List[str], max_len: int) -> List[str]:
-    chunks, cur = [], ""
-    for s in sentences:
-        s = s.strip()
+def _pack_sentences_stable(sents: List[str], max_len: int, max_extension: int) -> List[str]:
+    """
+    Stable-order packing:
+      1) Greedily append sentences while <= max_len.
+      2) If overflow and current chunk has >=2 sentences:
+           finalize all but the last; start new chunk with that last; retry pending sentence.
+      3) If overflow and chunk has <2 sentences:
+           a) allow if overflow <= max_extension (then finalize immediately),
+           b) else try whitespace split to fill,
+           c) else hard cut.
+    Never reorders sentences.
+    """
+    chunks: List[str] = []
+    cur_sents: List[str] = []
+
+    def cur_text() -> str:
+        return " ".join(cur_sents).strip()
+
+    i = 0
+    while i < len(sents):
+        s = sents[i].strip()
         if not s:
+            i += 1
             continue
-        candidate = s if not cur else (cur + (" " if not cur.endswith(" ") else "") + s)
-        if len(candidate) <= max_len:
-            cur = candidate
-        else:
-            if cur:
-                chunks.append(cur)
-                cur = ""
-            # s might itself exceed max_len
-            if len(s) > max_len:
-                chunks.extend(_split_overlong(s, max_len))
-            else:
-                cur = s
-    if cur:
-        chunks.append(cur)
-    return chunks
 
+        cur = cur_text()
+        sep = "" if not cur else " "
+        candidate = s if not cur else (cur + sep + s)
+
+        # Fits → take it
+        if len(candidate) <= max_len:
+            cur_sents.append(s)
+            i += 1
+            continue
+
+        # Overflow handling
+        if len(cur_sents) >= 2:
+            # Finalize all except last; carry last forward as new head; retry same sentence
+            last = cur_sents.pop()
+            kept = cur_text()
+            if kept:
+                chunks.append(kept)
+            cur_sents = [last]
+            continue
+
+        # len(cur_sents) is 0 or 1
+        if cur and len(candidate) <= max_len + max_extension:
+            # Allow small overflow; finalize immediately (no cascading)
+            cur_sents.append(s)
+            chunks.append(cur_text())
+            cur_sents.clear()
+            i += 1
+            continue
+
+        # Try whitespace split of pending sentence to fill remaining
+        remaining = max_len - len(cur) - (0 if not cur else 1)
+        if remaining > 0:
+            ws = _ws_split_prefix(s, remaining)
+            if ws:
+                head, tail = ws
+                if head:
+                    if cur:
+                        cur_sents.append(head)
+                        chunks.append(cur_text())
+                        cur_sents.clear()
+                    else:
+                        chunks.append(head)
+                    if tail:
+                        # Replace current sentence with its tail; retry without advancing i
+                        sents = sents[:i] + [tail] + sents[i+1:]
+                    else:
+                        i += 1
+                    continue
+
+        # Hard cut fallback
+        if cur:
+            # Flush current and retry sentence with fresh space
+            chunks.append(cur_text())
+            cur_sents.clear()
+            continue
+
+        # cur is empty → cut s
+        head = s[:max_len]
+        tail = s[max_len:].lstrip()
+        chunks.append(head)
+        if tail:
+            sents = sents[:i] + [tail] + sents[i+1:]
+        else:
+            i += 1
+
+    if cur_sents:
+        chunks.append(cur_text())
+
+    # Remove accidental empties
+    return [c for c in (x.strip() for x in chunks) if c]
+
+# === Public entrypoint ===
 async def segment_transcription(state: "AgentState", *, config: Optional["RunnableConfig"] = None) -> Dict:
     """
-    Segment long transcriptions into logical chunks without LLM:
-    split on punctuation, then merge sequentially up to max_segment_length.
+    Segment long transcriptions for extremist-content scanning:
+      - Split into sentences,
+      - Greedily pack up to max_segment_length,
+      - On overflow: stable-order backoff, optional small extension, whitespace split, then hard cut.
+    Expects config to provide:
+      - max_segment_length: int
+      - max_extension: int (optional, default 100)
     """
     cfg = Configuration.from_runnable_config(config)
     text = (state.transcription or "").strip()
-    trans_len = len(text)
+    max_len = int(cfg.max_segment_length)
+    max_ext = int(cfg.max_extension)
 
     if not text:
         logger.info("→ SEGMENT: empty transcription → 0 segments")
         return {"transcription_segments": []}
 
-    if trans_len <= cfg.max_segment_length:
-        logger.info(f"→ SEGMENT: {trans_len} chars → 1 segment (threshold: {cfg.max_segment_length})")
+    if len(text) <= max_len:
+        logger.info(f"→ SEGMENT: {len(text)} chars → 1 segment (threshold: {max_len})")
         return {"transcription_segments": [text]}
 
     try:
         sents = _sentences(text)
-        segments = _merge(sents, cfg.max_segment_length)
-        logger.info(f"→ SEGMENT: {trans_len} chars → {len(segments)} segments (threshold: {cfg.max_segment_length})")
+        segments = _pack_sentences_stable(sents, max_len, max_ext)
+        logger.info(
+            f"→ SEGMENT: {len(text)} chars → {len(segments)} segments "
+            f"(max_len: {max_len}, max_ext: {max_ext})"
+        )
+        logger.info(f"\n segments: {' '.join(f'{i}) {seg}' for i, seg in enumerate(segments))}")
         return {"transcription_segments": segments}
     except Exception:
         logger.exception("Segmentation failed, using single segment")
