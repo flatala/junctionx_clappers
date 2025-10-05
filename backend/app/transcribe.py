@@ -20,7 +20,7 @@ def convert_video_to_audio(video_path: str, output_audio_path: str) -> str:
         raise
 
 
-def split_audio_to_patches(audio_path: str, patch_duration_sec: int = 120, overlap_sec: int = 10):
+def split_audio_to_patches(audio_path: str, patch_duration_sec: int = 120, overlap_sec: int = 30):
     print(f"[INFO] Loading audio for patching: {audio_path}")
     y, sr = librosa.load(audio_path, sr=None)
     total_duration = librosa.get_duration(y=y, sr=sr)

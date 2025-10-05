@@ -144,7 +144,7 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
 
     result_from_llm = send_to_llm(transcribed_text, default_definitions, custom_definitions, negative_examples)
 
-    # print(result_from_llm)
+    print(result_from_llm)
 
     llm_spans = result_from_llm["spans"]
     processed_spans = find_matching_spans(transcribed_patches[0], llm_spans)
@@ -152,22 +152,14 @@ def main_background_function(job_id: str, original_path: str, patch_duration_sec
     final_result = {"transcript_text": transcribed_text, "spans": processed_spans}
 
     # Save final result to file
-    processed_dir = Path("processed")
-
-    # Check if the original path includes a zip extraction directory
-    zip_extract_dir = Path(original_path).parent
-    if zip_extract_dir.name.startswith(f"batch_{job.batch_id}_zip_"):
-        processed_dir = processed_dir / zip_extract_dir.name
-
-    processed_dir.mkdir(parents=True, exist_ok=True)
-    processed_file_path = processed_dir / (Path(original_path).stem + "_processed_spans.json")
-
-    with open(processed_file_path, 'w', encoding='utf-8') as f:
+    txt_path = Path(original_path).with_suffix('.json')
+    with open(txt_path, 'w', encoding='utf-8') as f:
         json.dump(final_result, f, indent=4)
 
-    # print(processed_spans)
+    print(processed_spans)
 
     job = db.get(Job, job_id)
     job.status = "completed"
     db.commit()
+
     db.close()
