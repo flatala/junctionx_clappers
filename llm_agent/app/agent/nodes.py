@@ -207,6 +207,7 @@ async def segment_transcription(state: "AgentState", *, config: Optional["Runnab
             f"→ SEGMENT: {len(text)} chars → {len(segments)} segments "
             f"(max_len: {max_len}, max_ext: {max_ext})"
         )
+        logger.info(f"\n segments: {' '.join(f'{i}) {seg}' for i, seg in enumerate(segments))}")
         return {"transcription_segments": segments}
     except Exception:
         logger.exception("Segmentation failed, using single segment")
